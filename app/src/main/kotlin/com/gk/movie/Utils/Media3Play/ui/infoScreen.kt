@@ -81,11 +81,10 @@ fun MovieContent(movieInfo: MovieInfo) {
                     .weight(0.45f)
                     .verticalScroll(rememberScrollState())
             ) {
-                MovieHeaderInfo(movieInfo)
+                MovieHeaderInfo(movieInfo, isExpandedScreen)
                 
-                // 将简介移动到了操作按钮的下方
                 Spacer(modifier = Modifier.height(32.dp))
-                MovieDescriptionSection(movieInfo)
+                MovieDescriptionSection(movieInfo, isExpandedScreen)
             }
 
             // 右半边：剧集列表与线路选择 (占据 55% 宽度)
@@ -94,13 +93,13 @@ fun MovieContent(movieInfo: MovieInfo) {
                     .weight(0.55f)
             ) {
                 if (movieInfo.playLists.isNotEmpty()) {
-                    PlayListSection(playLists = movieInfo.playLists)
+                    PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
                 }
             }
         }
     } else {
         // ==========================================
-        // 手机 / 窄屏布局：现有的上下单栏滑动显示 (整体结构不变)
+        // 手机 / 窄屏布局
         // ==========================================
         Column(
             modifier = Modifier
@@ -108,16 +107,16 @@ fun MovieContent(movieInfo: MovieInfo) {
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, top = 45.dp, bottom = 20.dp, end = 20.dp)
         ) {
-            MovieHeaderInfo(movieInfo)
+            MovieHeaderInfo(movieInfo, isExpandedScreen)
             
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
-            MovieDescriptionSection(movieInfo)
+            MovieDescriptionSection(movieInfo, isExpandedScreen)
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             if (movieInfo.playLists.isNotEmpty()) {
-                PlayListSection(playLists = movieInfo.playLists)
+                PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
             }
         }
     }
@@ -128,110 +127,145 @@ fun MovieContent(movieInfo: MovieInfo) {
 // ==========================================
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-fun MovieHeaderInfo(movieInfo: MovieInfo) {
+fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
+    val coverWidth = if (isExpandedScreen) 150.dp else 115.dp
+
     Row(modifier = Modifier.fillMaxWidth()) {
         GlideImage(
             model = movieInfo.coverUrl,
             contentDescription = "Cover",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .width(150.dp) // 稍微调窄一点让右侧信息更从容
+                .width(coverWidth)
                 .aspectRatio(0.7f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.LightGray)
         )
 
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(12.dp))
 
+        // 右侧信息栏
         Column(modifier = Modifier.weight(1f)) {
-        
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(if (isExpandedScreen) 10.dp else 0.dp))
             
             Text(
                 text = movieInfo.title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
+                style = if (isExpandedScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                lineHeight = if (isExpandedScreen) 32.sp else 24.sp
             )
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            InfoLabelRow(label = "导演", value = movieInfo.director, isExpandedScreen = isExpandedScreen)
+            Spacer(modifier = Modifier.height(6.dp))
+            InfoLabelRow(label = "主演", value = movieInfo.actors, isExpandedScreen = isExpandedScreen)
+            Spacer(modifier = Modifier.height(6.dp))
             
-            InfoLabelRow(label = "导演", value = movieInfo.director)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            InfoLabelRow(label = "主演", value = movieInfo.actors)
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            InfoLabelRow(label = "类型", value = movieInfo.types)
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 动态真实的评分区域
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = movieInfo.score, 
-                    color = Color(0xFFFF9800),
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                     // 使用解析出的真实评价次数
-                     Text(
-                         text = movieInfo.scoreCount, 
-                         style = MaterialTheme.typography.labelSmall, 
-                         color = MaterialTheme.colorScheme.onSurfaceVariant
-                     )
-                     Row {
-                         // 动态计算星星数量 (假设 10 分制，转换为 5 颗星)
-                         val numScore = movieInfo.score.toFloatOrNull() ?: 0f
-                         val filledStars = (numScore / 2).toInt().coerceIn(0, 5)
-                         val emptyStars = 5 - filledStars
-                         
-                         repeat(filledStars) { 
-                             Icon(Icons.Outlined.Star, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(14.dp)) 
-                         }
-                         repeat(emptyStars) { 
-                             Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp)) 
-                         }
-                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-
-            // 操作按钮区域：宽度自适应
+            // 完美组合：类型和评分合并到同一行
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Button(
-                    onClick = { /* TODO: 播放逻辑 */ },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE50914)),
-                    modifier = Modifier.height(40.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "播放", modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("播放", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
+                InfoLabelRow(
+                    label = "类型", 
+                    value = movieInfo.types, 
+                    isExpandedScreen = isExpandedScreen,
+                    modifier = Modifier.weight(1f) // 给类型分配剩余空间，防止挤压右边的评分
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                RatingArea(movieInfo, isExpandedScreen)
+            }
 
-                Surface(
-                    onClick = { /* TODO: 收藏逻辑 */ },
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center, 
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    ) {
-                         Icon(Icons.Outlined.Star, contentDescription = "收藏", modifier = Modifier.size(16.dp))
-                         Spacer(modifier = Modifier.width(4.dp))
-                         Text("收藏", style = MaterialTheme.typography.bodyMedium, fontSize = 14.sp)
-                    }
-                }
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 操作按钮紧跟在类型评分的下方（即封面右侧的中下部）
+            ActionArea(isExpandedScreen)
+        }
+    }
+}
+
+// 辅助组件：评分区域
+@Composable
+fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
+    val scoreStyle = if (isExpandedScreen) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleMedium
+    val starSize = if (isExpandedScreen) 14.dp else 10.dp
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = movieInfo.score, 
+            color = Color(0xFFFF9800),
+            style = scoreStyle,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.width(if (isExpandedScreen) 8.dp else 4.dp))
+        Column {
+             Text(
+                 text = movieInfo.scoreCount, 
+                 style = MaterialTheme.typography.labelSmall, 
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 fontSize = if (isExpandedScreen) 11.sp else 9.sp
+             )
+             Row {
+                 val numScore = movieInfo.score.toFloatOrNull() ?: 0f
+                 val filledStars = (numScore / 2).toInt().coerceIn(0, 5)
+                 val emptyStars = 5 - filledStars
+                 
+                 repeat(filledStars) { 
+                     Icon(Icons.Outlined.Star, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(starSize)) 
+                 }
+                 repeat(emptyStars) { 
+                     Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(starSize)) 
+                 }
+             }
+        }
+    }
+}
+
+// 辅助组件：操作按钮区域
+@Composable
+fun ActionArea(isExpandedScreen: Boolean) {
+    val btnHeight = if (isExpandedScreen) 40.dp else 30.dp
+    val fontSize = if (isExpandedScreen) 14.sp else 12.sp
+    val iconSize = if (isExpandedScreen) 18.dp else 14.dp
+    val paddingH = if (isExpandedScreen) 16.dp else 12.dp
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Button(
+            onClick = { /* TODO: 播放逻辑 */ },
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ),
+            modifier = Modifier
+                .height(btnHeight)
+                .weight(1f),
+            contentPadding = PaddingValues(horizontal = paddingH),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Icon(Icons.Filled.PlayArrow, contentDescription = "播放", modifier = Modifier.size(iconSize))
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("播放", fontWeight = FontWeight.Bold, fontSize = fontSize, maxLines = 1)
+        }
+
+        Surface(
+            onClick = { /* TODO: 收藏逻辑 */ },
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier
+                .height(btnHeight)
+                .weight(1f)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center, 
+                modifier = Modifier.padding(horizontal = paddingH)
+            ) {
+                 Icon(Icons.Outlined.Star, contentDescription = "收藏", modifier = Modifier.size(iconSize))
+                 Spacer(modifier = Modifier.width(4.dp))
+                 Text("收藏", style = MaterialTheme.typography.bodyMedium, fontSize = fontSize, maxLines = 1)
             }
         }
     }
@@ -241,66 +275,75 @@ fun MovieHeaderInfo(movieInfo: MovieInfo) {
 // 抽离出来的组件：2. 影片简介区域
 // ==========================================
 @Composable
-fun MovieDescriptionSection(movieInfo: MovieInfo) {
+fun MovieDescriptionSection(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
+    val titleSize = if (isExpandedScreen) 16.sp else 13.sp
+
     Column {
         Box(
             modifier = Modifier
-                .background(Color(0xFFE50914), shape = RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(4.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-             Text("简介", fontSize = 16.sp, color = Color.White, style = MaterialTheme.typography.labelMedium)
+             Text("简介", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
         Spacer(modifier = Modifier.height(12.dp))
 
-        ExpandableDescription(text = movieInfo.description)
+        ExpandableDescription(text = movieInfo.description, isExpandedScreen)
     }
 }
 
-// 辅助组件：红底白字小标签
+// 辅助组件：红底白字小标签 (带有 modifier 参数以支持自适应排版)
 @Composable
-fun InfoLabelRow(label: String, value: String) {
+fun InfoLabelRow(label: String, value: String, isExpandedScreen: Boolean, modifier: Modifier = Modifier.fillMaxWidth()) {
+    val labelSize = if (isExpandedScreen) 16.sp else 12.sp
+    val valueSize = if (isExpandedScreen) 16.sp else 13.sp
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
         verticalAlignment = Alignment.Top
     ) {
         Box(
             modifier = Modifier
-                .background(Color(0xFFE50914), shape = RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(4.dp))
                 .padding(horizontal = 6.dp, vertical = 2.dp)
         ) {
             Text(
                 text = label,
-                color = Color.White,
-                fontSize = 16.sp,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontSize = labelSize,
                 fontWeight = FontWeight.Bold
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = value,
-            fontSize = 16.sp,
+            fontSize = valueSize,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 1.dp)
+            modifier = Modifier
+                .weight(1f) // 给文字设置 weight，使其在有限空间内变成省略号而不是撑破布局
+                .padding(top = 1.dp)
         )
     }
 }
 
 // 辅助组件：带展开/收起动画的文字
 @Composable
-fun ExpandableDescription(text: String) {
+fun ExpandableDescription(text: String, isExpandedScreen: Boolean) {
     var expanded by remember { mutableStateOf(false) }
+    val bodyStyle = if (isExpandedScreen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall
+    val btnTextSize = if (isExpandedScreen) 16.sp else 12.sp
 
     Column(modifier = Modifier.animateContentSize()) {
         Text(
             text = text,
-            style = MaterialTheme.typography.bodyMedium,
+            style = bodyStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = if (expanded) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
-            lineHeight = MaterialTheme.typography.bodyMedium.lineHeight * 1.5f
+            lineHeight = bodyStyle.lineHeight * 1.5f
         )
         
         Box(
@@ -318,7 +361,7 @@ fun ExpandableDescription(text: String) {
             ) {
                  Text(
                      text = if (expanded) "收起 ∧" else "展开 ∨",
-                     fontSize = 16.sp,
+                     fontSize = btnTextSize,
                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                      style = MaterialTheme.typography.labelMedium
                  )
@@ -331,18 +374,19 @@ fun ExpandableDescription(text: String) {
 // 抽离出来的组件：3. 剧集列表与选集区域
 // ==========================================
 @Composable
-fun PlayListSection(playLists: List<PlayList>) {
+fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var isReversed by remember { mutableStateOf(false) }
 
+    val titleSize = if (isExpandedScreen) 16.sp else 13.sp
+
     Column {
-        // --- 新增：带有红底白字的“线路选择”标签 ---
         Box(
             modifier = Modifier
-                .background(Color(0xFFE50914), shape = RoundedCornerShape(4.dp))
+                .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(4.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-             Text("线路选择", fontSize = 16.sp, color = Color.White, style = MaterialTheme.typography.labelMedium)
+             Text("线路选择", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -364,7 +408,7 @@ fun PlayListSection(playLists: List<PlayList>) {
                                 .padding(horizontal = 16.dp)
                                 .height(3.dp)
                                 .clip(RoundedCornerShape(1.5.dp))
-                                .background(Color(0xFFE50914))
+                                .background(MaterialTheme.colorScheme.primary)
                         )
                     }
                 },
@@ -380,8 +424,9 @@ fun PlayListSection(playLists: List<PlayList>) {
                         text = { 
                             Text(
                                 text = playList.sourceName, 
+                                fontSize = titleSize,
                                 fontWeight = FontWeight.SemiBold,
-                                color = if (selectedTabIndex == index) Color(0xFFE50914) else MaterialTheme.colorScheme.onSurface
+                                color = if (selectedTabIndex == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             ) 
                         }
                     )
@@ -397,7 +442,7 @@ fun PlayListSection(playLists: List<PlayList>) {
             ) {
                 Text(
                     text = if (isReversed) "倒序 " else "正序 ",
-                    fontSize = 16.sp,
+                    fontSize = titleSize,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -407,26 +452,28 @@ fun PlayListSection(playLists: List<PlayList>) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 获取真实的剧集数据并渲染
         val currentEpisodes = playLists[selectedTabIndex].episodes
         val displayEpisodes = if (isReversed) currentEpisodes.reversed() else currentEpisodes
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 80.dp),
-            modifier = Modifier.heightIn(max = 800.dp), // 平板模式下如果不限制高度会撑满，有需要可以去掉 heightIn
+            modifier = Modifier.heightIn(max = 800.dp), 
             contentPadding = PaddingValues(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             items(displayEpisodes) { episode ->
-                EpisodeItem(episode)
+                EpisodeItem(episode, isExpandedScreen)
             }
         }
     }
 }
 
 @Composable
-fun EpisodeItem(episode: Episode) {
+fun EpisodeItem(episode: Episode, isExpandedScreen: Boolean) {
+    val paddingV = if (isExpandedScreen) 12.dp else 10.dp
+    val textStyle = if (isExpandedScreen) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
@@ -434,13 +481,12 @@ fun EpisodeItem(episode: Episode) {
             .clickable { 
                 Log.d("EpisodeItem", "Clicked: ${episode.name}, URL: ${episode.url}")
             }
-            .padding(vertical = 12.dp, horizontal = 4.dp),
+            .padding(vertical = paddingV, horizontal = 4.dp),
         contentAlignment = Alignment.Center
     ) {
-        // 使用解析出的真实集数名称 (如：第1集，或者 1)
         Text(
             text = episode.name,
-            style = MaterialTheme.typography.bodyMedium,
+            style = textStyle,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

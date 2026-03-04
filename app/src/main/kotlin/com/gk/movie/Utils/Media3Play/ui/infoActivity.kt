@@ -8,7 +8,8 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
+// 导入你自定义的主题
+import com.gk.movie.ui.theme.ComposeEmptyActivityTheme
 
 class infoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -18,7 +19,8 @@ class infoActivity : ComponentActivity() {
         requestManageExternalStoragePermission()
 
         setContent {
-            MaterialTheme {
+            // 【关键修改】：使用你的自定义主题，它才能感知系统的深色模式和动态色彩！
+            ComposeEmptyActivityTheme {
                 InfoScreen()
             }
         }
