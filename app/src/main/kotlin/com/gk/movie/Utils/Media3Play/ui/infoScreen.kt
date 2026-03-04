@@ -287,7 +287,7 @@ fun MovieDescriptionSection(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
              Text("简介", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
         ExpandableDescription(text = movieInfo.description, isExpandedScreen)
     }
@@ -386,7 +386,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
                 .background(MaterialTheme.colorScheme.primary, shape = RoundedCornerShape(4.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-             Text("线路选择", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
+             Text("线路", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
        // Spacer(modifier = Modifier.height(5.dp))
