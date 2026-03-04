@@ -297,7 +297,7 @@ fun MovieDescriptionSection(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
 @Composable
 fun InfoLabelRow(label: String, value: String, isExpandedScreen: Boolean, modifier: Modifier = Modifier.fillMaxWidth()) {
     val labelSize = if (isExpandedScreen) 16.sp else 12.sp
-    val valueSize = if (isExpandedScreen) 16.sp else 13.sp
+    val valueSize = if (isExpandedScreen) 16.sp else 12.sp
 
     Row(
         modifier = modifier,
@@ -389,7 +389,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
              Text("线路选择", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(5.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
