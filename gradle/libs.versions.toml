@@ -1,0 +1,73 @@
+[versions]
+agp = "8.13.2"
+kotlin = "2.3.0"
+coreKtx = "1.18.0-alpha01"
+lifecycleRuntimeKtx = "2.11.0-alpha01"
+activityCompose = "1.13.0-alpha01"
+composeBom = "2026.01.01"
+
+# Material 3 Adaptive (平板开发核心库)
+adaptive = "1.3.0-alpha09"
+
+# 第三方库
+okhttp = "5.3.2"
+glideCompose = "1.0.0-beta08"
+jsoup = "1.22.1"
+kotlinxSerialization = "1.10.0"
+
+media3 = "1.10.0-beta01"         # Android 官方媒体库 (ExoPlayer)
+media3FFmpeg = "1.9.0+1"         # FFmpeg扩展库
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+# Kotlin 2.0+ 必须使用的 Compose 编译器插件
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+# JSON 序列化插件
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+
+[libraries]
+# 核心基础
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+
+# Compose BOM (统一管理 Compose 版本)
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+androidx-ui = { group = "androidx.compose.ui", name = "ui" }
+androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
+androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
+
+# Pad/Foldable 自适应布局核心库 (必须！)
+androidx-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "adaptive" }
+androidx-adaptive-layout = { group = "androidx.compose.material3.adaptive", name = "adaptive-layout", version.ref = "adaptive" }
+androidx-adaptive-navigation = { group = "androidx.compose.material3.adaptive", name = "adaptive-navigation", version.ref = "adaptive" }
+
+# [修改处] 去掉别名末尾的 "-class"，避免 Gradle 生成代码时与 Java 关键字冲突
+material3-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class" }
+
+# 第三方工具库
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+# Glide 的 Compose 专用版本
+glide-compose = { group = "com.github.bumptech.glide", name = "compose", version.ref = "glideCompose" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+
+
+# --- 8. 媒体播放 (Media3 / ExoPlayer) ---
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3" }
+androidx-media3-exoplayer-hls = { group = "androidx.media3", name = "media3-exoplayer-hls", version.ref = "media3" }
+androidx-media3-exoplayer-rtsp = { group = "androidx.media3", name = "media3-exoplayer-rtsp", version.ref = "media3" }
+androidx-media3-exoplayer-dash = { group = "androidx.media3", name = "media3-exoplayer-dash", version.ref = "media3" }
+androidx-media3-decoder = { group = "androidx.media3", name = "media3-decoder", version.ref = "media3" }
+androidx-media3-session = { group = "androidx.media3", name = "media3-session", version.ref = "media3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "media3" }
+androidx-media3-ui-compose = { group = "androidx.media3", name = "media3-ui-compose", version.ref = "media3" }
+androidx-media3-ui-compose-material3 = { group = "androidx.media3", name = "media3-ui-compose-material3", version.ref = "media3" }
+
+# FFmpeg扩展支持库
+org-jellyfin-media3-ffmpeg = { group = "org.jellyfin.media3", name = "media3-ffmpeg-decoder", version.ref = "media3FFmpeg" }

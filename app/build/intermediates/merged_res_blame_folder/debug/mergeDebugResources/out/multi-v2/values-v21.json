@@ -1,0 +1,39 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.gk.movie.app-mergeDebugResources-47:/values-v21/values-v21.xml",
+            "map": [
+                {
+                    "source": "/data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/230d16ef96aa6e98614dc900b9fcacaa/transformed/media3-session-1.10.0-beta01/res/values-v21/values-v21.xml",
+                    "from": {
+                        "startLines": "2,5,8,11",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,217,374,536",
+                        "endLines": "4,7,10,13",
+                        "endColumns": "10,10,10,10",
+                        "endOffsets": "212,369,531,692"
+                    },
+                    "to": {
+                        "startLines": "8,11,14,17",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "401,563,720,882",
+                        "endLines": "10,13,16,19",
+                        "endColumns": "10,10,10,10",
+                        "endOffsets": "558,715,877,1038"
+                    }
+                },
+                {
+                    "source": "/data/user/0/com.tom.rv2ide/files/home/.gradle/caches/9.0.0/transforms/28b4950a0ee32edd7244528ee9cc4a18/transformed/media3-ui-1.10.0-beta01/res/values-v21/values-v21.xml",
+                    "from": {
+                        "startLines": "2,3",
+                        "startColumns": "4,4",
+                        "startOffsets": "55,114",
+                        "endLines": "2,7",
+                        "endColumns": "58,10",
+                        "endOffsets": "109,396"
+                    }
+                }
+            ]
+        }
+    ]
+}
