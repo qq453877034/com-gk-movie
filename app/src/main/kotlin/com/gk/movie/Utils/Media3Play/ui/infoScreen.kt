@@ -72,25 +72,25 @@ fun MovieContent(movieInfo: MovieInfo) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
-            horizontalArrangement = Arrangement.spacedBy(32.dp)
+                .padding(start = 20.dp, top = 60.dp, bottom = 20.dp, end = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 左半边：海报、基础信息、简介 (占据 45% 宽度)
+            // 左半边：海报、基础信息、简介 (占据 60% 宽度)
             Column(
                 modifier = Modifier
-                    .weight(0.45f)
+                    .weight(0.6f)
                     .verticalScroll(rememberScrollState())
             ) {
                 MovieHeaderInfo(movieInfo, isExpandedScreen)
                 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(30.dp))
                 MovieDescriptionSection(movieInfo, isExpandedScreen)
             }
 
-            // 右半边：剧集列表与线路选择 (占据 55% 宽度)
+            // 右半边：剧集列表与线路选择 (占据 40% 宽度)
             Column(
                 modifier = Modifier
-                    .weight(0.55f)
+                    .weight(0.4f)
             ) {
                 if (movieInfo.playLists.isNotEmpty()) {
                     PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
@@ -109,11 +109,11 @@ fun MovieContent(movieInfo: MovieInfo) {
         ) {
             MovieHeaderInfo(movieInfo, isExpandedScreen)
             
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             
             MovieDescriptionSection(movieInfo, isExpandedScreen)
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (movieInfo.playLists.isNotEmpty()) {
                 PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
@@ -128,7 +128,7 @@ fun MovieContent(movieInfo: MovieInfo) {
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
-    val coverWidth = if (isExpandedScreen) 150.dp else 115.dp
+    val coverWidth = if (isExpandedScreen) 155.dp else 115.dp
 
     Row(modifier = Modifier.fillMaxWidth()) {
         GlideImage(
@@ -349,7 +349,7 @@ fun ExpandableDescription(text: String, isExpandedScreen: Boolean) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp),
+                .padding(top = 5.dp),
             contentAlignment = Alignment.Center
         ) {
             Box(
@@ -357,7 +357,7 @@ fun ExpandableDescription(text: String, isExpandedScreen: Boolean) {
                     .clip(RoundedCornerShape(16.dp))
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .clickable { expanded = !expanded }
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
+                    .padding(horizontal = 14.dp, vertical = 4.dp)
             ) {
                  Text(
                      text = if (expanded) "收起 Ⅹ" else "展开 Ⅴ",
@@ -405,7 +405,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
                         Box(
                             modifier = Modifier
                                 .tabIndicatorOffset(tabPositions[selectedTabIndex])
-                                .padding(horizontal = 16.dp)
+                                .padding(horizontal = 30.dp)
                                 .height(3.dp)
                                 .clip(RoundedCornerShape(1.5.dp))
                                 .background(MaterialTheme.colorScheme.primary)
