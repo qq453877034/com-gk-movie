@@ -146,13 +146,13 @@ fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
 
         // 右侧信息栏
         Column(modifier = Modifier.weight(1f)) {
-            Spacer(modifier = Modifier.height(if (isExpandedScreen) 10.dp else 0.dp))
+            Spacer(modifier = Modifier.height(if (isExpandedScreen) 10.dp else 4.dp))
             
             Text(
                 text = movieInfo.title,
                 style = if (isExpandedScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                lineHeight = if (isExpandedScreen) 32.sp else 24.sp
+                lineHeight = if (isExpandedScreen) 32.sp else 28.sp
             )
             
             Spacer(modifier = Modifier.height(12.dp))
@@ -172,11 +172,11 @@ fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
                     isExpandedScreen = isExpandedScreen,
                     modifier = Modifier.weight(1f) // 给类型分配剩余空间，防止挤压右边的评分
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+               // Spacer(modifier = Modifier.width(0.dp))
                 RatingArea(movieInfo, isExpandedScreen)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             
             // 操作按钮紧跟在类型评分的下方（即封面右侧的中下部）
             ActionArea(isExpandedScreen)
@@ -193,7 +193,7 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = movieInfo.score, 
-            color = Color(0xFFFF9800),
+            color = MaterialTheme.colorScheme.primary, //Color(0xFFFF0000),
             style = scoreStyle,
             fontWeight = FontWeight.Bold
         )
@@ -211,7 +211,7 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
                  val emptyStars = 5 - filledStars
                  
                  repeat(filledStars) { 
-                     Icon(Icons.Outlined.Star, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(starSize)) 
+                     Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary /*Color(0xFFFF0000)*/, modifier = Modifier.size(starSize)) 
                  }
                  repeat(emptyStars) { 
                      Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(starSize)) 
@@ -224,10 +224,10 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
 // 辅助组件：操作按钮区域
 @Composable
 fun ActionArea(isExpandedScreen: Boolean) {
-    val btnHeight = if (isExpandedScreen) 40.dp else 30.dp
+    val btnHeight = if (isExpandedScreen) 35.dp else 30.dp
     val fontSize = if (isExpandedScreen) 14.sp else 12.sp
     val iconSize = if (isExpandedScreen) 18.dp else 14.dp
-    val paddingH = if (isExpandedScreen) 16.dp else 12.dp
+    val paddingH = if (isExpandedScreen) 14.dp else 12.dp
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -360,7 +360,7 @@ fun ExpandableDescription(text: String, isExpandedScreen: Boolean) {
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
                  Text(
-                     text = if (expanded) "收起 ∧" else "展开 ∨",
+                     text = if (expanded) "收起 Ⅹ" else "展开 Ⅴ",
                      fontSize = btnTextSize,
                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                      style = MaterialTheme.typography.labelMedium
@@ -389,7 +389,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
              Text("线路选择", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
-        Spacer(modifier = Modifier.height(5.dp))
+       // Spacer(modifier = Modifier.height(5.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -441,7 +441,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
                 color = MaterialTheme.colorScheme.surfaceVariant
             ) {
                 Text(
-                    text = if (isReversed) "倒序 " else "正序 ",
+                    text = if (isReversed) "倒序 ▼" else "正序 ▲",
                     fontSize = titleSize,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium,
@@ -457,7 +457,7 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
 
         LazyVerticalGrid(
             columns = GridCells.Adaptive(minSize = 80.dp),
-            modifier = Modifier.heightIn(max = 800.dp), 
+            modifier = Modifier.heightIn(max = 600.dp), 
             contentPadding = PaddingValues(bottom = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
