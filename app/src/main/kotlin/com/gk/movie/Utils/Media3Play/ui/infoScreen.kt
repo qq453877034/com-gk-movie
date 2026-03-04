@@ -105,7 +105,7 @@ fun MovieContent(movieInfo: MovieInfo) {
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, top = 45.dp, bottom = 20.dp, end = 20.dp)
+                .padding(start = 10.dp, top = 45.dp, bottom = 10.dp, end = 10.dp)
         ) {
             MovieHeaderInfo(movieInfo, isExpandedScreen)
             
@@ -128,9 +128,10 @@ fun MovieContent(movieInfo: MovieInfo) {
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
-    val coverWidth = if (isExpandedScreen) 155.dp else 115.dp
-
+    val coverWidth = 160.dp
     Row(modifier = Modifier.fillMaxWidth()) {
+    
+    if (isExpandedScreen) {
         GlideImage(
             model = movieInfo.coverUrl,
             contentDescription = "Cover",
@@ -141,8 +142,24 @@ fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.LightGray)
         )
+    } else {
+    GlideImage(
+            model = movieInfo.coverUrl,
+            contentDescription = "Cover",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxWidth(0.35f)
+                .aspectRatio(0.7f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.LightGray)
+        )
+    }
 
-        Spacer(modifier = Modifier.width(12.dp))
+if (isExpandedScreen) {
+        Spacer(modifier = Modifier.width(15.dp))
+} else {
+Spacer(modifier = Modifier.width(6.dp))
+}
 
         // 右侧信息栏
         Column(modifier = Modifier.weight(1f)) {
@@ -152,14 +169,15 @@ fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
                 text = movieInfo.title,
                 style = if (isExpandedScreen) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
+                fontSize = if (isExpandedScreen) 30.sp else 20.sp,
                 lineHeight = if (isExpandedScreen) 32.sp else 28.sp
             )
             
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             InfoLabelRow(label = "导演", value = movieInfo.director, isExpandedScreen = isExpandedScreen)
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             InfoLabelRow(label = "主演", value = movieInfo.actors, isExpandedScreen = isExpandedScreen)
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             
             // 完美组合：类型和评分合并到同一行
             Row(
@@ -197,7 +215,7 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
             style = scoreStyle,
             fontWeight = FontWeight.Bold
         )
-        Spacer(modifier = Modifier.width(if (isExpandedScreen) 8.dp else 4.dp))
+        Spacer(modifier = Modifier.width(if (isExpandedScreen) 8.dp else 2.dp))
         Column {
              Text(
                  text = movieInfo.scoreCount, 
@@ -227,7 +245,7 @@ fun ActionArea(isExpandedScreen: Boolean) {
     val btnHeight = if (isExpandedScreen) 35.dp else 30.dp
     val fontSize = if (isExpandedScreen) 14.sp else 12.sp
     val iconSize = if (isExpandedScreen) 18.dp else 14.dp
-    val paddingH = if (isExpandedScreen) 14.dp else 12.dp
+    val paddingH = if (isExpandedScreen) 14.dp else 10.dp
 
     Row(
         modifier = Modifier.fillMaxWidth(),
