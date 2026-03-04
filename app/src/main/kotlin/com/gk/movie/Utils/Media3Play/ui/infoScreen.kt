@@ -61,7 +61,6 @@ fun InfoScreen(viewModel: InfoViewModel = viewModel()) {
 
 @Composable
 fun MovieContent(movieInfo: MovieInfo) {
-    // 获取当前窗口的自适应信息（判断是手机、折叠屏还是平板）
     val windowSizeClass = currentWindowAdaptiveInfo().windowSizeClass
     val isExpandedScreen = windowSizeClass.windowWidthSizeClass == WindowWidthSizeClass.EXPANDED
 
@@ -75,22 +74,18 @@ fun MovieContent(movieInfo: MovieInfo) {
                 .padding(start = 20.dp, top = 60.dp, bottom = 20.dp, end = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 左半边：海报、基础信息、简介 (占据 60% 宽度)
             Column(
                 modifier = Modifier
                     .weight(0.6f)
                     .verticalScroll(rememberScrollState())
             ) {
                 MovieHeaderInfo(movieInfo, isExpandedScreen)
-                
                 Spacer(modifier = Modifier.height(30.dp))
                 MovieDescriptionSection(movieInfo, isExpandedScreen)
             }
 
-            // 右半边：剧集列表与线路选择 (占据 40% 宽度)
             Column(
-                modifier = Modifier
-                    .weight(0.4f)
+                modifier = Modifier.weight(0.4f)
             ) {
                 if (movieInfo.playLists.isNotEmpty()) {
                     PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
@@ -99,7 +94,7 @@ fun MovieContent(movieInfo: MovieInfo) {
         }
     } else {
         // ==========================================
-        // 手机 / 窄屏布局
+        // 手机 / 窄屏 / 平板小窗 布局
         // ==========================================
         Column(
             modifier = Modifier
@@ -108,13 +103,10 @@ fun MovieContent(movieInfo: MovieInfo) {
                 .padding(start = 10.dp, top = 45.dp, bottom = 10.dp, end = 10.dp)
         ) {
             MovieHeaderInfo(movieInfo, isExpandedScreen)
-            
             Spacer(modifier = Modifier.height(10.dp))
-            
             MovieDescriptionSection(movieInfo, isExpandedScreen)
-
             Spacer(modifier = Modifier.height(10.dp))
-
+            
             if (movieInfo.playLists.isNotEmpty()) {
                 PlayListSection(playLists = movieInfo.playLists, isExpandedScreen)
             }
@@ -123,43 +115,28 @@ fun MovieContent(movieInfo: MovieInfo) {
 }
 
 // ==========================================
-// 抽离出来的组件：1. 头部海报与核心信息区域
+// 1. 头部海报与核心信息区域
 // ==========================================
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
 fun MovieHeaderInfo(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
-    val coverWidth = 160.dp
     Row(modifier = Modifier.fillMaxWidth()) {
-    
-    if (isExpandedScreen) {
+        
+        // 【优化】：不再写两遍 GlideImage，利用 then() 和 inline if 动态分配宽度
         GlideImage(
             model = movieInfo.coverUrl,
             contentDescription = "Cover",
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .width(coverWidth)
+                // 解决平板小窗和手机差异的关键：小屏下也使用固定宽度(比如 120.dp)，防止被百分比拉扯变形
+                .width(if (isExpandedScreen) 160.dp else 120.dp)
                 .aspectRatio(0.7f)
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.LightGray)
         )
-    } else {
-    GlideImage(
-            model = movieInfo.coverUrl,
-            contentDescription = "Cover",
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth(0.35f)
-                .aspectRatio(0.7f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.LightGray)
-        )
-    }
 
-if (isExpandedScreen) {
-        Spacer(modifier = Modifier.width(15.dp))
-} else {
-Spacer(modifier = Modifier.width(6.dp))
-}
+        // 【优化】：合并冗余的 if-else
+        Spacer(modifier = Modifier.width(if (isExpandedScreen) 15.dp else 6.dp))
 
         // 右侧信息栏
         Column(modifier = Modifier.weight(1f)) {
@@ -179,7 +156,6 @@ Spacer(modifier = Modifier.width(6.dp))
             InfoLabelRow(label = "主演", value = movieInfo.actors, isExpandedScreen = isExpandedScreen)
             Spacer(modifier = Modifier.height(4.dp))
             
-            // 完美组合：类型和评分合并到同一行
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -188,15 +164,13 @@ Spacer(modifier = Modifier.width(6.dp))
                     label = "类型", 
                     value = movieInfo.types, 
                     isExpandedScreen = isExpandedScreen,
-                    modifier = Modifier.weight(1f) // 给类型分配剩余空间，防止挤压右边的评分
+                    modifier = Modifier.weight(1f) 
                 )
-               // Spacer(modifier = Modifier.width(0.dp))
                 RatingArea(movieInfo, isExpandedScreen)
             }
 
             Spacer(modifier = Modifier.height(18.dp))
             
-            // 操作按钮紧跟在类型评分的下方（即封面右侧的中下部）
             ActionArea(isExpandedScreen)
         }
     }
@@ -211,7 +185,7 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             text = movieInfo.score, 
-            color = MaterialTheme.colorScheme.primary, //Color(0xFFFF0000),
+            color = MaterialTheme.colorScheme.primary,
             style = scoreStyle,
             fontWeight = FontWeight.Bold
         )
@@ -229,7 +203,7 @@ fun RatingArea(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
                  val emptyStars = 5 - filledStars
                  
                  repeat(filledStars) { 
-                     Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary /*Color(0xFFFF0000)*/, modifier = Modifier.size(starSize)) 
+                     Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(starSize)) 
                  }
                  repeat(emptyStars) { 
                      Icon(Icons.Outlined.Star, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(starSize)) 
@@ -290,7 +264,7 @@ fun ActionArea(isExpandedScreen: Boolean) {
 }
 
 // ==========================================
-// 抽离出来的组件：2. 影片简介区域
+// 2. 影片简介区域
 // ==========================================
 @Composable
 fun MovieDescriptionSection(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
@@ -311,7 +285,7 @@ fun MovieDescriptionSection(movieInfo: MovieInfo, isExpandedScreen: Boolean) {
     }
 }
 
-// 辅助组件：红底白字小标签 (带有 modifier 参数以支持自适应排版)
+// 辅助组件：红底白字小标签
 @Composable
 fun InfoLabelRow(label: String, value: String, isExpandedScreen: Boolean, modifier: Modifier = Modifier.fillMaxWidth()) {
     val labelSize = if (isExpandedScreen) 16.sp else 12.sp
@@ -341,7 +315,7 @@ fun InfoLabelRow(label: String, value: String, isExpandedScreen: Boolean, modifi
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .weight(1f) // 给文字设置 weight，使其在有限空间内变成省略号而不是撑破布局
+                .weight(1f) 
                 .padding(top = 1.dp)
         )
     }
@@ -389,7 +363,7 @@ fun ExpandableDescription(text: String, isExpandedScreen: Boolean) {
 }
 
 // ==========================================
-// 抽离出来的组件：3. 剧集列表与选集区域
+// 3. 剧集列表与选集区域
 // ==========================================
 @Composable
 fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
@@ -407,8 +381,6 @@ fun PlayListSection(playLists: List<PlayList>, isExpandedScreen: Boolean) {
              Text("线路", fontSize = titleSize, color = MaterialTheme.colorScheme.onPrimary, style = MaterialTheme.typography.labelMedium)
         }
         
-       // Spacer(modifier = Modifier.height(5.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
