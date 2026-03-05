@@ -1,17 +1,17 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/AndroidManifest.xml",
+      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt",
       "selection": {
         "end": {
-          "column": 0,
-          "index": 0,
-          "line": 0
+          "column": 2,
+          "index": 29258,
+          "line": 591
         },
         "start": {
-          "column": 0,
-          "index": 0,
-          "line": 0
+          "column": 2,
+          "index": 29258,
+          "line": 591
         }
       }
     },
@@ -20,43 +20,13 @@
       "selection": {
         "end": {
           "column": 1,
-          "index": 26622,
-          "line": 678
+          "index": 19520,
+          "line": 433
         },
         "start": {
           "column": 1,
-          "index": 26622,
-          "line": 678
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/infoActivity.kt",
-      "selection": {
-        "end": {
-          "column": 0,
-          "index": 0,
-          "line": 0
-        },
-        "start": {
-          "column": 0,
-          "index": 0,
-          "line": 0
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/ui/theme/Theme.kt",
-      "selection": {
-        "end": {
-          "column": 1,
-          "index": 2765,
-          "line": 78
-        },
-        "start": {
-          "column": 1,
-          "index": 2765,
-          "line": 78
+          "index": 19520,
+          "line": 433
         }
       }
     }
