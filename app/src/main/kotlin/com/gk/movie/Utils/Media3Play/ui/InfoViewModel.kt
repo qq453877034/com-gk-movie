@@ -1,15 +1,16 @@
+// 文件路径: com/gk/movie/Utils/Media3Play/ui/InfoViewModel.kt
 package com.gk.movie.Utils.Media3Play.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-// import com.gk.movie.Utils.okhttpUtils.OkhttpManager // 暂且不需要
+import com.gk.movie.Utils.okhttpUtils.OkhttpManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-// import okhttp3.Request // 暂且不需要
+import okhttp3.Request
 import org.jsoup.Jsoup
-import java.io.File
 import kotlin.math.min
 
 class InfoViewModel : ViewModel() {
@@ -18,88 +19,95 @@ class InfoViewModel : ViewModel() {
     val uiState: StateFlow<UiState> = _uiState
 
     init {
-        // 调试期间，这里的 URL 参数暂时不会被用到，但保留方法签名方便以后改回来
-        fetchMovieInfo("https://ww66.taiee.lol/index.php/vod/detail/id/529.html")
+        // 传入新站点的测试地址
+        fetchMovieInfo("https://www.jkan.app/video/261653.html")
     }
 
     private fun fetchMovieInfo(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // ==========================================
-                // 使用本地文件进行 UI 调试
-                // ==========================================
-                val localFile = File("/storage/emulated/0/Alarms/信息页.html")
-                if (!localFile.exists()) {
-                    _uiState.value = UiState.Error("找不到本地文件，请检查路径: ${localFile.absolutePath}")
+                // 网络请求获取 HTML (使用了下方的 OkhttpManager)
+                val request = Request.Builder().url(url).build()
+                val response = OkhttpManager.client.newCall(request).execute()
+                
+                if (!response.isSuccessful) {
+                    _uiState.value = UiState.Error("网络请求失败: ${response.code}")
                     return@launch
                 }
                 
-                // 读取本地 HTML 内容
-                val html = localFile.readText(Charsets.UTF_8)
+                val html = response.body?.string() ?: ""
+                val doc = Jsoup.parse(html)
+
+                // 1. 优先使用 head 里的 meta 标签精准获取信息，防止出错
+                val title = doc.selectFirst("meta[property=og:title]")?.attr("content") ?: "未知标题"
+                val coverUrl = doc.selectFirst("meta[property=og:image]")?.attr("content") ?: ""
                 
-                // 复用原有的解析逻辑
-                val movieInfo = parseHtml(html)
+                val directorMeta = doc.selectFirst("meta[property=og:video:director]")?.attr("content")
+                val director = if (directorMeta.isNullOrBlank()) "未知" else directorMeta
                 
+                val actorsMeta = doc.selectFirst("meta[property=og:video:actor]")?.attr("content")
+                val actors = if (actorsMeta.isNullOrBlank()) "未知" else actorsMeta
+                
+                val types = doc.selectFirst("meta[property=og:video:class]")?.attr("content") ?: "未知类型"
+                
+                // 获取评分和简介
+                val score = doc.selectFirst(".douban_score i")?.text()?.replace("评分", "")?.trim() ?: "暂无"
+                val scoreCount = "豆瓣/TMDB"
+                val description = doc.selectFirst("meta[name=description]")?.attr("content") ?: "暂无简介"
+
+                // 2. 解析播放列表 (剧集)
+                val playlists = mutableListOf<PlayList>()
+                // 获取所有的线路 Tab (如：1080 LFF, 1080 LZ)
+                val sourceNodes = doc.select("#NumTab a")
+                // 获取对应的剧集列表容器
+                val listBoxNodes = doc.select(".play_list_box")
+
+                val count = min(sourceNodes.size, listBoxNodes.size)
+                for (i in 0 until count) {
+                    // 线路名：优先拿 alt 属性，拿不到再拿内部文本
+                    val sourceName = sourceNodes[i].attr("alt").trim().takeIf { it.isNotEmpty() } 
+                        ?: sourceNodes[i].text().replace("\u00A0", "").trim()
+                    
+                    val episodes = mutableListOf<Episode>()
+                    
+                    // 获取当前线路下完整的剧集 a 标签
+                    val links = listBoxNodes[i].select(".playlist_full ul.content_playlist li a")
+                    for (link in links) {
+                        val name = link.text().trim()
+                        val href = link.attr("href")
+                        
+                        // ★ 核心过滤：过滤掉“APP播放”这种广告链接
+                        if (href.isNotBlank() && !name.contains("APP") && !href.contains("gkan.net")) {
+                            // 补全相对路径
+                            val fullUrl = if (href.startsWith("http")) href else "https://www.jkan.app$href"
+                            episodes.add(Episode(name = name, url = fullUrl))
+                        }
+                    }
+                    
+                    // 只有包含有效剧集的线路才被添加
+                    if (episodes.isNotEmpty()) {
+                        playlists.add(PlayList(sourceName, episodes))
+                    }
+                }
+
+                val movieInfo = MovieInfo(
+                    title = title,
+                    coverUrl = coverUrl,
+                    director = director,
+                    actors = actors,
+                    types = types,
+                    score = score,
+                    scoreCount = scoreCount,
+                    description = description,
+                    playLists = playlists
+                )
+
                 _uiState.value = UiState.Success(movieInfo)
 
             } catch (e: Exception) {
-                e.printStackTrace()
-                _uiState.value = UiState.Error("解析或读取异常: ${e.message}")
+                Log.e("InfoViewModel", "解析失败", e)
+                _uiState.value = UiState.Error("解析异常: ${e.message}")
             }
         }
-    }
-
-    private fun parseHtml(html: String): MovieInfo {
-        val doc = Jsoup.parse(html)
-
-        // 解析基本信息
-        val title = doc.selectFirst("h3.slide-info-title")?.text() ?: "未知标题"
-        val coverUrl = doc.selectFirst(".detail-pic img")?.attr("data-src") ?: ""
-        val score = doc.selectFirst(".fraction")?.text() ?: "N/A"
-        
-        // 【新增】解析真实的评分次数 (如 "482次评分")
-        val scoreCount = doc.selectFirst(".score-title .text-site")?.text() ?: "暂无评分"
-        
-        val description = doc.selectFirst("#height_limit")?.text() ?: "暂无简介"
-
-        // 解析导演、演员、类型
-        var director = "未知"
-        var actors = "未知"
-        var types = "未知"
-        
-        doc.select(".slide-info.partition").forEach { element ->
-            val text = element.text()
-            when {
-                text.contains("导演") -> director = element.select("a").joinToString(", ") { it.text() }
-                text.contains("演员") -> actors = element.select("a").joinToString(", ") { it.text() }
-                text.contains("类型") -> types = element.select("a").joinToString(", ") { it.text() }
-            }
-        }
-
-        // 解析播放列表
-        val playlists = mutableListOf<PlayList>()
-        val sourceNodes = doc.select(".anthology-tab a")
-        val listBoxNodes = doc.select(".anthology-list-box")
-        
-        val count = min(sourceNodes.size, listBoxNodes.size)
-        for (i in 0 until count) {
-            val sourceName = sourceNodes[i].ownText().replace("\u00a0", "").trim()
-            val episodes = listBoxNodes[i].select("ul.anthology-list-play li a").map {
-                Episode(name = it.text(), url = it.attr("href"))
-            }
-            playlists.add(PlayList(sourceName, episodes))
-        }
-
-        return MovieInfo(
-            title = title,
-            coverUrl = coverUrl,
-            director = director,
-            actors = actors,
-            types = types,
-            score = score,
-            scoreCount = scoreCount, // 【新增】传入真实数据
-            description = description,
-            playLists = playlists
-        )
     }
 }

@@ -1,109 +1,135 @@
 // 文件路径: com/gk/movie/Utils/okhttpUtils/OkhttpManager.kt
 package com.gk.movie.Utils.okhttpUtils
 
-import android.util.Log
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Response
+import java.net.InetAddress
+import java.net.Socket
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.SocketFactory
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 object OkhttpManager {
     private const val TAG = "OkhttpManager"
+    private var appContext: Context? = null
 
-    // 基础主机名，方便稍后动态替换 Referer
-    private const val BASE_HOST = "ww66.taiee.lol"
-
-    /**
-     * 构建一个模拟真实浏览器行为的 OkHttpClient
-     */
-    val client: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .addInterceptor(BrowserSimulationInterceptor())
-            // 💡(可选) 如果目标站点的 HTTPS 证书过期或不规范导致报错，解开下面两行的注释来忽略证书错误
-            // .sslSocketFactory(createInsecureSslSocketFactory(), insecureTrustManager)
-            // .hostnameVerifier { _, _ -> true }
-            .build()
+    // 初始化 Context，用于获取系统网络服务
+    fun init(context: Context) {
+        appContext = context.applicationContext
     }
 
     /**
-     * 核心拦截器：注入强大的浏览器伪装头
+     * 核心黑科技：寻找真实的物理网络（剔除 VPN 虚拟网卡）
      */
-    class BrowserSimulationInterceptor : Interceptor {
-        override fun intercept(chain: Interceptor.Chain): Response {
-            val originalRequest = chain.request()
+    private fun getPhysicalNetwork(): Network? {
+        val ctx = appContext ?: return null
+        val cm = ctx.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = cm.activeNetwork
+        val activeCaps = cm.getNetworkCapabilities(activeNetwork)
 
-            Log.d(TAG, "Requesting URL: ${originalRequest.url}")
+        // 如果当前网络根本不是 VPN，那就正常返回 null，走系统默认即可
+        if (activeCaps != null && !activeCaps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+            return null
+        }
 
-            val requestBuilder = originalRequest.newBuilder()
-                // 1. 设置极强的主流浏览器 User-Agent (这里使用的是较新的 Chrome Windows 版)
-                .header(
-                    "User-Agent",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-                )
-                // 2. Accept 头：告诉服务器我们要的是什么（包含 html, 图片和一些新型格式）
-                .header(
-                    "Accept",
-                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
-                )
-                // 3. 语言偏好设置，装成中文用户
-                .header(
-                    "Accept-Language",
-                    "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7"
-                )
-                // 4. 跨域与防盗链的核心头
-                // 根据要求，当前主要针对信息页的域名进行防盗链伪装
-                .header("Referer", "https://$BASE_HOST/index.php")
-                .header("Origin", "https://$BASE_HOST")
+        // 如果当前连着 VPN，我们就遍历所有网卡，揪出那个真实的、能上网的物理网卡 (Wi-Fi / 蜂窝)
+        for (network in cm.allNetworks) {
+            val caps = cm.getNetworkCapabilities(network)
+            if (caps != null &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) {
+                return network
+            }
+        }
+        return null
+    }
 
-                // 5. 告诉服务器保持连接
-                .header("Connection", "keep-alive")
-                
-                // 6. 某些防护系统需要的缓存控制头
-                .header("Cache-Control", "max-age=0")
-                .header("Upgrade-Insecure-Requests", "1")
-                
-                // 7. 设置获取数据相关请求标识
-                .header("Sec-Fetch-Dest", "document")
-                .header("Sec-Fetch-Mode", "navigate")
-                .header("Sec-Fetch-Site", "same-origin")
-                .header("Sec-Fetch-User", "?1")
-
-            return chain.proceed(requestBuilder.build())
+    // 自定义 Socket 工厂，强行绑定到物理网卡，让流量不进 VPN 隧道
+    private val vpnBypassSocketFactory = object : SocketFactory() {
+        override fun createSocket(): Socket {
+            val network = getPhysicalNetwork()
+            return network?.socketFactory?.createSocket() ?: getDefault().createSocket()
+        }
+        override fun createSocket(host: String, port: Int): Socket {
+            val network = getPhysicalNetwork()
+            return network?.socketFactory?.createSocket(host, port) ?: getDefault().createSocket(host, port)
+        }
+        override fun createSocket(host: String, port: Int, localHost: InetAddress, localPort: Int): Socket {
+            val network = getPhysicalNetwork()
+            return network?.socketFactory?.createSocket(host, port, localHost, localPort) ?: getDefault().createSocket(host, port, localHost, localPort)
+        }
+        override fun createSocket(host: InetAddress, port: Int): Socket {
+            val network = getPhysicalNetwork()
+            return network?.socketFactory?.createSocket(host, port) ?: getDefault().createSocket(host, port)
+        }
+        override fun createSocket(address: InetAddress, port: Int, localAddress: InetAddress, localPort: Int): Socket {
+            val network = getPhysicalNetwork()
+            return network?.socketFactory?.createSocket(address, port, localAddress, localPort) ?: getDefault().createSocket(address, port, localAddress, localPort)
         }
     }
 
+    // 自定义 DNS 解析，防止被 VPN 劫持 DNS
+    private val vpnBypassDns = object : Dns {
+        override fun lookup(hostname: String): List<InetAddress> {
+            val network = getPhysicalNetwork()
+            return if (network != null) {
+                network.getAllByName(hostname).toList()
+            } else {
+                Dns.SYSTEM.lookup(hostname)
+            }
+        }
+    }
 
-    // ==========================================
-    // 危险操作：忽略所有 SSL 证书的工具方法 (备用)
-    // ==========================================
-
-    /**
-     * 创建一个不信任任何证书的 TrustManager
-     */
     private val insecureTrustManager: X509TrustManager = object : X509TrustManager {
         override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
         override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
     }
 
-    /**
-     * 创建一个忽略证书校验的 SSLSocketFactory
-     */
     private fun createInsecureSslSocketFactory(): javax.net.ssl.SSLSocketFactory {
         return try {
-            val sslContext = SSLContext.getInstance("SSL")
+            val sslContext = SSLContext.getInstance("TLS")
             sslContext.init(null, arrayOf<TrustManager>(insecureTrustManager), SecureRandom())
             sslContext.socketFactory
         } catch (e: Exception) {
-            throw RuntimeException("Failed to create insecure SSL SocketFactory", e)
+            throw RuntimeException(e)
+        }
+    }
+
+    val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .addInterceptor(BrowserSimulationInterceptor())
+            // ★ 核心注入：强制接管 Socket 生成和 DNS 解析，绕开 VPN
+            .socketFactory(vpnBypassSocketFactory)
+            .dns(vpnBypassDns)
+            .sslSocketFactory(createInsecureSslSocketFactory(), insecureTrustManager)
+            .hostnameVerifier { _, _ -> true }
+            .build()
+    }
+
+    class BrowserSimulationInterceptor : Interceptor {
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val originalRequest = chain.request()
+
+            val requestBuilder = originalRequest.newBuilder()
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+
+            return chain.proceed(requestBuilder.build())
         }
     }
 }

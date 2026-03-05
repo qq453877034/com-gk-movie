@@ -1,6 +1,7 @@
-// 文件路径: app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt
+// 文件路径: com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt
 package com.gk.movie.Utils.Media3Play.ui
 
+import android.util.Log
 import android.view.LayoutInflater
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -36,12 +38,16 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.ui.PlayerView
 import com.gk.movie.R
 import com.gk.movie.Utils.Media3Play.Util.Media3Manager
+import com.gk.movie.Utils.Media3Play.Util.cast.CastDeviceDialog
+import com.gk.movie.Utils.Media3Play.Util.cast.CastViewModel
+import com.gk.movie.Utils.Media3Play.Util.cast.NextEpisodeDialog
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -54,7 +60,7 @@ fun PlayViewsScreen(
     episodeName: String,
     isMiniPlayer: Boolean,
     isFullscreen: Boolean = false,
-    hasNextEpisode: Boolean = false, // ★ 新增：判断是否有下一集
+    hasNextEpisode: Boolean = false, 
     onFullscreenToggle: (() -> Unit)? = null,
     onNextEpisode: (() -> Unit)? = null, 
     playLists: List<PlayList> = emptyList(),
@@ -67,8 +73,12 @@ fun PlayViewsScreen(
 ) {
     val context = LocalContext.current
     val player = remember { Media3Manager.getInstance(context) }
+    
+    val castViewModel: CastViewModel = viewModel()
+    var showCastDialog by remember { mutableStateOf(false) }
+    var showNextEpisodePrompt by remember { mutableStateOf(false) }
+    val tvPlaybackEnded by castViewModel.tvPlaybackEnded.collectAsState()
 
-    // ★ 智能尺寸适配：如果是手机竖屏(包含吸顶卡片)，大幅度缩小 UI 控件大小 ★
     val configuration = LocalConfiguration.current
     val isPhonePortrait = !isFullscreen && !isMiniPlayer && configuration.screenWidthDp < 840
 
@@ -109,14 +119,23 @@ fun PlayViewsScreen(
         }
     }
 
+    LaunchedEffect(tvPlaybackEnded) {
+        if (tvPlaybackEnded && hasNextEpisode) {
+            showNextEpisodePrompt = true
+            castViewModel.resetPlaybackEndedState()
+        }
+    }
+
+    // ★ 核心修复1：直接从底层播放器读取初始状态，而不是赋予 0 或 false
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
-    var currentPosition by remember { mutableLongStateOf(0L) }
-    var duration by remember { mutableLongStateOf(0L) }
+    var currentPosition by remember { mutableLongStateOf(player.currentPosition) }
+    var duration by remember { mutableLongStateOf(if (player.duration == C.TIME_UNSET) 0L else player.duration) }
     var isSeeking by remember { mutableStateOf(false) } 
     var showControls by remember { mutableStateOf(true) } 
     var isLocked by remember { mutableStateOf(false) } 
     var resolutionText by remember { mutableStateOf("解析中") }
-    var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
+    // 同样，倍速也要拿底层的真实倍速
+    var playbackSpeed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
     
     var showSpeedMenu by remember { mutableStateOf(false) }
     var showMoreMenu by remember { mutableStateOf(false) }
@@ -135,12 +154,19 @@ fun PlayViewsScreen(
     )
 
     DisposableEffect(player) {
+        // ★ 核心修复2：即使 UI 被重组（旋转屏幕或小窗），也立即同步一次底层数据，防止 00:00 BUG
+        isPlaying = player.isPlaying
+        val d = player.duration
+        duration = if (d == C.TIME_UNSET) 0L else d
+        currentPosition = player.currentPosition
+        playbackSpeed = player.playbackParameters.speed
+
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(isPlayingState: Boolean) { isPlaying = isPlayingState }
             override fun onEvents(player: Player, events: Player.Events) {
                 if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_TIMELINE_CHANGED)) {
-                    val d = player.duration
-                    duration = if (d == C.TIME_UNSET) 0L else d
+                    val currentDur = player.duration
+                    duration = if (currentDur == C.TIME_UNSET) 0L else currentDur
                 }
             }
             override fun onVideoSizeChanged(videoSize: VideoSize) {
@@ -173,7 +199,6 @@ fun PlayViewsScreen(
         }
     }
 
-    // ★ 安全区域合并：系统状态栏/导航条 + 物理挖孔刘海屏 ★
     val safeInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
 
     Box(modifier = modifier.background(Color.Black)) {
@@ -198,9 +223,6 @@ fun PlayViewsScreen(
                     }
                 }
         ) {
-            // ==========================================
-            // A. 顶部栏 
-            // ==========================================
             AnimatedVisibility(
                 visible = showControls && !isLocked && !isMiniPlayer,
                 enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
@@ -216,7 +238,7 @@ fun PlayViewsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = Color.White,
                         modifier = Modifier.size(topIconSize).clickable { onFullscreenToggle?.invoke() } 
@@ -236,7 +258,17 @@ fun PlayViewsScreen(
                     Text(text = systemTime, color = Color.White, fontSize = timeTextSize, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.width(12.dp))
                     
-                    Icon(imageVector = Icons.Default.Cast, contentDescription = "Cast", tint = Color.White, modifier = Modifier.size(topIconSize).clickable { /* TODO */ })
+                    Icon(
+                        imageVector = Icons.Default.Cast, 
+                        contentDescription = "Cast", 
+                        tint = Color.White, 
+                        modifier = Modifier.size(topIconSize).clickable { 
+                            if (isPlaying) {
+                                Media3Manager.pause()
+                            }
+                            showCastDialog = true 
+                        }
+                    )
 
                     if (isFullscreen) {
                         Spacer(modifier = Modifier.width(16.dp))
@@ -253,9 +285,6 @@ fun PlayViewsScreen(
                 }
             }
 
-            // ==========================================
-            // B. 居中播放/暂停
-            // ==========================================
             AnimatedVisibility(
                 visible = showControls && !isLocked,
                 enter = fadeIn() + scaleIn(initialScale = 0.8f),
@@ -278,9 +307,6 @@ fun PlayViewsScreen(
                 }
             }
 
-            // ==========================================
-            // C. 左侧锁定屏幕
-            // ==========================================
             AnimatedVisibility(
                 visible = showControls && !isMiniPlayer,
                 enter = fadeIn() + slideInHorizontally(initialOffsetX = { -it }),
@@ -300,9 +326,6 @@ fun PlayViewsScreen(
                 }
             }
 
-            // ==========================================
-            // D. 底部控制栏 
-            // ==========================================
             AnimatedVisibility(
                 visible = showControls && !isLocked,
                 enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
@@ -313,12 +336,10 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                        // ★ 核心修复：全屏时避开小白条（导航栏），防止拖动条被遮挡 ★
                         .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)) else Modifier)
                         .padding(horizontal = bottomSpaced, vertical = bottomPadding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // ★ 智能显隐下一集按钮 ★
                     if (hasNextEpisode && !isMiniPlayer) {
                         Icon(
                             imageVector = Icons.Default.SkipNext,
@@ -377,9 +398,6 @@ fun PlayViewsScreen(
                 }
             }
 
-            // ==========================================
-            // E1. 侧边栏：倍速
-            // ==========================================
             AnimatedVisibility(
                 visible = showSpeedMenu && !isMiniPlayer,
                 enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
@@ -416,9 +434,6 @@ fun PlayViewsScreen(
                 }
             }
 
-            // ==========================================
-            // E2. 侧边栏：全屏专享“更多/选集”面板
-            // ==========================================
             AnimatedVisibility(
                 visible = showMoreMenu && !isMiniPlayer && isFullscreen,
                 enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
@@ -507,7 +522,6 @@ fun PlayViewsScreen(
                         val episodes = playLists.getOrNull(selectedTabIndex)?.episodes ?: emptyList()
                         val displayEpisodes = if (isReversed) episodes.reversed() else episodes
 
-                        // ★ 核心修复：使用 key(selectedTabIndex) 强制刷新网格，修复数量重复和错乱Bug ★
                         key(selectedTabIndex, isReversed) {
                             LazyVerticalGrid(
                                 columns = GridCells.Adaptive(minSize = 80.dp),
@@ -543,6 +557,37 @@ fun PlayViewsScreen(
                         }
                     }
                 }
+            }
+
+            if (showCastDialog) {
+                CastDeviceDialog(
+                    viewModel = castViewModel,
+                    onDismiss = { showCastDialog = false },
+                    onDeviceClick = { device ->
+                        castViewModel.selectDevice(device)
+                        
+                        Log.e("CAST_DEBUG", "推送给电视的 URL: $url")
+                        
+                        castViewModel.castUrlWithPosition(
+                            url = url,
+                            title = "$title - $episodeName",
+                            startPositionMs = currentPosition
+                        )
+                        showCastDialog = false
+                    }
+                )
+            }
+
+            if (showNextEpisodePrompt) {
+                NextEpisodeDialog(
+                    onDismiss = {
+                        showNextEpisodePrompt = false
+                    },
+                    onPlayNext = {
+                        showNextEpisodePrompt = false
+                        onNextEpisode?.invoke()
+                    }
+                )
             }
         }
     }

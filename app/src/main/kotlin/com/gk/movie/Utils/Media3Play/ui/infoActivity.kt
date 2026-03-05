@@ -1,3 +1,4 @@
+// 文件路径: com/gk/movie/Utils/Media3Play/ui/infoActivity.kt
 package com.gk.movie.Utils.Media3Play.ui
 
 import android.content.Intent
@@ -8,18 +9,20 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-// 导入你自定义的主题
+import com.gk.movie.Utils.okhttpUtils.OkhttpManager 
 import com.gk.movie.ui.theme.ComposeEmptyActivityTheme
 
 class infoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
+        // 在这里初始化 OkhttpManager，把应用的 Context 传给它
+        OkhttpManager.init(this.applicationContext)
+        
         // 检查并申请所有文件访问权限 (Android 11+)
         requestManageExternalStoragePermission()
 
         setContent {
-            // 【关键修改】：使用你的自定义主题，它才能感知系统的深色模式和动态色彩！
             ComposeEmptyActivityTheme {
                 InfoScreen()
             }
@@ -28,7 +31,6 @@ class infoActivity : ComponentActivity() {
 
     private fun requestManageExternalStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // 如果还没有获得管理外部存储的权限
             if (!Environment.isExternalStorageManager()) {
                 try {
                     val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
@@ -42,5 +44,11 @@ class infoActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // ★ 核心修复3：彻底退出页面时，一定要释放底层的视频播放器，避免后台声音残留
+    override fun onDestroy() {
+        super.onDestroy()
+        com.gk.movie.Utils.Media3Play.Util.Media3Manager.release()
     }
 }
