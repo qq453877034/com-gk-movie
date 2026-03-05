@@ -234,7 +234,7 @@ fun PlayViewsScreen(
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
                         .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)
-                        .padding(horizontal = 16.dp, vertical = bottomPadding),
+                        .padding(horizontal = 10.dp, vertical = bottomPadding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -245,7 +245,7 @@ fun PlayViewsScreen(
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
-                        text = "$title $episodeName / $resolutionText",
+                        text = "$title $episodeName[$resolutionText]",
                         color = Color.White,
                         fontSize = topTextSize,
                         fontWeight = FontWeight.Bold,
