@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
+import android.os.Build
 import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -32,12 +33,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView // ★ 新增
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat // ★ 新增
-import androidx.core.view.WindowInsetsCompat // ★ 新增
-import androidx.core.view.WindowInsetsControllerCompat // ★ 新增
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gk.movie.Utils.Media3Play.Util.Media3Manager
 import com.gk.movie.Utils.Media3Play.Util.VideoSniffer
@@ -82,12 +83,22 @@ fun MovieContent(movieInfo: MovieInfo) {
     val context = LocalContext.current
     val activity = context.findActivity() 
     val configuration = LocalConfiguration.current
+    val view = LocalView.current
+    
+    val displayMetrics = context.resources.displayMetrics
+    val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+    val screenHeightDp = displayMetrics.heightPixels / displayMetrics.density
+    val physicalSmallestWidthDp = kotlin.math.min(screenWidthDp, screenHeightDp)
+    val isPhysicalTablet = physicalSmallestWidthDp >= 600
+
     val isExpandedScreen = configuration.screenWidthDp >= 840
 
     DisposableEffect(Unit) {
         onDispose {
             Media3Manager.release()
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (!isPhysicalTablet) {
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
         }
     }
 
@@ -105,26 +116,19 @@ fun MovieContent(movieInfo: MovieInfo) {
         isFullscreen = false
     }
 
-    val view = LocalView.current
-    // ★ 核心升级：控制全屏时的系统沉浸式体验 (隐藏状态栏和导航小白条)
     LaunchedEffect(isFullscreen) {
-        val window = activity?.window
-        if (isFullscreen) {
-            if (!isExpandedScreen) {
-                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            }
-            if (window != null) {
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                // 隐藏所有的系统状态栏和底部导航栏
+        val window = activity?.window ?: return@LaunchedEffect
+        val isMultiWindow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && activity.isInMultiWindowMode
+        val shouldControlSystem = !isPhysicalTablet && !isMultiWindow
+
+        if (shouldControlSystem) {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            if (isFullscreen) {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                 insetsController.hide(WindowInsetsCompat.Type.systemBars())
-                // 设置为滑动边缘短时显示 (沉浸式模式)
                 insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
-        } else {
-            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            if (window != null) {
-                val insetsController = WindowCompat.getInsetsController(window, view)
-                // 退出全屏，重新显示状态栏和小白条
+            } else {
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                 insetsController.show(WindowInsetsCompat.Type.systemBars())
             }
         }
@@ -137,6 +141,7 @@ fun MovieContent(movieInfo: MovieInfo) {
             selectedEpisodeName = firstEp?.name ?: "" 
         }
         if (selectedEpisodeUrl != null) {
+            if (realVideoUrl == null) isSniffing = true // ★ 修复：立刻呈现加载状态
             isPlaying = true
         }
     }
@@ -160,6 +165,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                     selectedEpisodeUrl = nextEp.url
                     selectedEpisodeName = nextEp.name
                     realVideoUrl = null 
+                    isSniffing = true // ★ 修复：立刻呈现加载状态
                     isPlaying = true
                 }
             }
@@ -179,30 +185,41 @@ fun MovieContent(movieInfo: MovieInfo) {
         }
     }
 
-    if (isFullscreen && realVideoUrl != null) {
-        PlayViewsScreen(
-            url = realVideoUrl!!,
-            title = movieInfo.title,
-            episodeName = selectedEpisodeName,
-            coverUrl = movieInfo.coverUrl, 
-            isMiniPlayer = false,
-            isFullscreen = true,
-            hasNextEpisode = hasNextEpisode,
-            onFullscreenToggle = { isFullscreen = false }, 
-            onNextEpisode = handleNextEpisode, 
-            playLists = movieInfo.playLists,   
-            selectedTabIndex = selectedTabIndex,
-            isReversed = isReversed,
-            onTabSelected = { selectedTabIndex = it; isReversed = false },
-            onReverseToggle = { isReversed = !isReversed },
-            onEpisodeSelected = { url, name -> 
-                selectedEpisodeUrl = url
-                selectedEpisodeName = name
-                realVideoUrl = null
-                isPlaying = true 
-            },
-            modifier = Modifier.fillMaxSize().background(Color.Black)
-        )
+    if (isFullscreen) {
+        if (realVideoUrl != null && !isSniffing) {
+            PlayViewsScreen(
+                url = realVideoUrl!!,
+                title = movieInfo.title,
+                episodeName = selectedEpisodeName,
+                coverUrl = movieInfo.coverUrl, 
+                isMiniPlayer = false,
+                isFullscreen = true,
+                hasNextEpisode = hasNextEpisode,
+                onFullscreenToggle = { isFullscreen = false }, 
+                onNextEpisode = handleNextEpisode, 
+                playLists = movieInfo.playLists,   
+                selectedTabIndex = selectedTabIndex,
+                isReversed = isReversed,
+                onTabSelected = { selectedTabIndex = it; isReversed = false },
+                onReverseToggle = { isReversed = !isReversed },
+                onEpisodeSelected = { url, name -> 
+                    selectedEpisodeUrl = url
+                    selectedEpisodeName = name
+                    realVideoUrl = null
+                    isSniffing = true // ★ 修复
+                    isPlaying = true 
+                },
+                modifier = Modifier.fillMaxSize().background(Color.Black)
+            )
+        } else {
+            // 全屏时的加载态
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                SniffingLoadingView(modifier = Modifier.wrapContentSize())
+            }
+        }
         return 
     }
 
@@ -219,8 +236,18 @@ fun MovieContent(movieInfo: MovieInfo) {
                     .verticalScroll(rememberScrollState())
             ) {
                 if (isPlaying && selectedEpisodeUrl != null) {
-                    if (isSniffing) {
-                        SniffingLoadingView(modifier = Modifier.fillMaxWidth())
+                    if (isSniffing || realVideoUrl == null) {
+                        // ★ 核心修复：固定 16:9 比例的占位加载框，彻底防止闪烁坍塌
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16f / 9f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            SniffingLoadingView(modifier = Modifier.wrapContentSize())
+                        }
                     } else if (realVideoUrl != null) {
                         PlayViewsScreen(
                             url = realVideoUrl!!,
@@ -241,6 +268,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                 selectedEpisodeUrl = url
                                 selectedEpisodeName = name
                                 realVideoUrl = null
+                                isSniffing = true // ★ 修复
                                 isPlaying = true 
                             },
                             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))
@@ -280,6 +308,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                             selectedEpisodeUrl = url
                             selectedEpisodeName = name
                             realVideoUrl = null
+                            isSniffing = true // ★ 修复
                             isPlaying = true 
                         },
                         isExpandedScreen = isExpandedScreen,
@@ -345,8 +374,18 @@ fun MovieContent(movieInfo: MovieInfo) {
                                     modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp)).background(Color.Black)
                                 )
                             } else {
-                                if (isSniffing) {
-                                    SniffingLoadingView(modifier = Modifier.fillMaxWidth())
+                                if (isSniffing || realVideoUrl == null) {
+                                    // ★ 核心修复：固定 16:9 比例的占位加载框
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .aspectRatio(16f / 9f)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(Color.Black),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        SniffingLoadingView(modifier = Modifier.wrapContentSize())
+                                    }
                                 } else if (realVideoUrl != null) {
                                     PlayViewsScreen(
                                         url = realVideoUrl!!,
@@ -367,6 +406,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                             selectedEpisodeUrl = url
                                             selectedEpisodeName = name
                                             realVideoUrl = null
+                                            isSniffing = true // ★ 修复
                                             isPlaying = true 
                                         },
                                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))
@@ -414,6 +454,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                 selectedEpisodeUrl = url
                                 selectedEpisodeName = name
                                 realVideoUrl = null
+                                isSniffing = true // ★ 修复
                                 isPlaying = true 
                             },
                             isExpandedScreen = isExpandedScreen,

@@ -4,6 +4,7 @@ package com.gk.movie.Utils.Media3Play.ui
 import android.content.Context
 import android.media.AudioManager
 import android.net.TrafficStats 
+import android.os.BatteryManager
 import android.os.Process 
 import android.util.Log
 import android.view.LayoutInflater
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -36,7 +38,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -94,30 +95,30 @@ fun PlayViewsScreen(
     var showNextEpisodePrompt by remember { mutableStateOf(false) }
     val tvPlaybackEnded by castViewModel.tvPlaybackEnded.collectAsState()
 
-    val configuration = LocalConfiguration.current
-    val isPhone = configuration.smallestScreenWidthDp < 600
-    val useCompactUI = isMiniPlayer || isPhone || (!isFullscreen && configuration.screenWidthDp < 840)
+    val displayMetrics = context.resources.displayMetrics
+    val screenWidthDp = displayMetrics.widthPixels / displayMetrics.density
+    val screenHeightDp = displayMetrics.heightPixels / displayMetrics.density
+    val physicalSmallestWidthDp = kotlin.math.min(screenWidthDp, screenHeightDp)
+    val isPhysicalPhone = physicalSmallestWidthDp < 600
+    val isPhysicalTablet = !isPhysicalPhone
+
+    val isPhoneFullscreen = isPhysicalPhone && isFullscreen
+    val isTabletFullscreen = isPhysicalTablet && isFullscreen
+
+    val centerIconSize = if (isMiniPlayer) 24.dp else if (isTabletFullscreen) 54.dp else if (isPhoneFullscreen) 36.dp else 32.dp
+    val centerBgPadding = if (isMiniPlayer) 6.dp else if (isTabletFullscreen) 20.dp else if (isPhoneFullscreen) 12.dp else 10.dp
+    val lockIconSize = if (isTabletFullscreen) 24.dp else if (isFullscreen) 20.dp else 18.dp
+    val lockBgPadding = if (isFullscreen) 10.dp else 8.dp
     
-    // ★ 恢复中心和侧边按键的默认紧凑状态，不因全屏而受影响
-    val isCompact = useCompactUI 
-    
-    // 中心图标/侧边锁屏 的尺寸（维持原样）
-    val centerIconSize = if (isMiniPlayer) 24.dp else if (isCompact) 30.dp else 48.dp
-    val centerBgPadding = if (isMiniPlayer) 6.dp else if (isCompact) 8.dp else 16.dp
-    val lockIconSize = if (isCompact) 18.dp else 24.dp
-    val lockBgPadding = if (isCompact) 8.dp else 12.dp
-    val bottomPadding = if (isMiniPlayer) 4.dp else if (isCompact) 8.dp else 16.dp
-    val bottomSpaced = if (isMiniPlayer) 8.dp else if (isCompact) 12.dp else 20.dp
+    val bottomPadding = if (isMiniPlayer) 4.dp else if (isFullscreen) 16.dp else 8.dp
+    val bottomSpaced = if (isMiniPlayer) 8.dp else if (isTabletFullscreen) 32.dp else if (isPhoneFullscreen) 20.dp else 12.dp
 
-    // ★ 精准控制：如果是在手机上且为全屏模式，仅仅放大 Top 栏 和 Bottom 栏 内部的内容（大两号）
-    val isPhoneFullscreen = isPhone && isFullscreen
+    val topIconSize = if (isFullscreen) (if (isPhysicalTablet) 36.dp else 28.dp) else 22.dp
+    val topTextSize = if (isFullscreen) (if (isPhysicalTablet) 22.sp else 18.sp) else 15.sp
+    val timeTextSize = if (isFullscreen) (if (isPhysicalTablet) 18.sp else 14.sp) else 12.sp
 
-    val topIconSize = if (isPhoneFullscreen) 26.dp else (if (isCompact) 20.dp else 24.dp)
-    val topTextSize = if (isPhoneFullscreen) 17.sp else (if (isCompact) 13.sp else 16.sp)
-    val timeTextSize = if (isPhoneFullscreen) 15.sp else (if (isCompact) 11.sp else 13.sp)
-
-    val bottomIconSize = if (isMiniPlayer) 16.dp else if (isPhoneFullscreen) 26.dp else (if (isCompact) 20.dp else 28.dp)
-    val bottomTextSize = if (isMiniPlayer) 8.sp else if (isPhoneFullscreen) 15.sp else (if (isCompact) 11.sp else 13.sp)
+    val bottomIconSize = if (isMiniPlayer) 16.dp else if (isFullscreen) (if (isPhysicalTablet) 36.dp else 28.dp) else 22.dp
+    val bottomTextSize = if (isMiniPlayer) 8.sp else if (isFullscreen) (if (isPhysicalTablet) 18.sp else 14.sp) else 12.sp
 
     var wasPlaying by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -154,6 +155,15 @@ fun PlayViewsScreen(
     var dragSeekPosition by remember { mutableLongStateOf(0L) }
     var dragBrightnessValue by remember { mutableFloatStateOf(0f) }
     var dragVolumeValue by remember { mutableFloatStateOf(0f) }
+
+    var batteryLevel by remember { mutableIntStateOf(100) }
+    LaunchedEffect(Unit) {
+        val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        while (true) {
+            batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+            delay(60000L) 
+        }
+    }
 
     LaunchedEffect(url) {
         val currentUri = Media3Manager.currentMediaItem?.localConfiguration?.uri?.toString()
@@ -274,7 +284,11 @@ fun PlayViewsScreen(
             factory = { ctx ->
                 val playerView = LayoutInflater.from(ctx).inflate(R.layout.view_custom_player, null, false) as PlayerView
                 playerView.player = Media3Manager.getInstance(ctx)
+                playerView.keepScreenOn = true 
                 playerView
+            },
+            update = { view ->
+                view.keepScreenOn = isPlaying 
             },
             modifier = Modifier.matchParentSize()
         )
@@ -313,72 +327,74 @@ fun PlayViewsScreen(
                         }
                     )
                 }
-                .pointerInput(Unit) {
-                    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-                    val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+                .then(
+                    if (isMiniPlayer) Modifier else Modifier.pointerInput(Unit) {
+                        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+                        val maxVolume = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
-                    detectDragGestures(
-                        onDragStart = { 
-                            dragMode = DragMode.NONE 
-                        },
-                        onDragEnd = {
-                            if (dragMode == DragMode.SEEK) {
-                                Media3Manager.seekTo(dragSeekPosition)
-                            }
-                            dragMode = DragMode.NONE
-                        },
-                        onDragCancel = {
-                            dragMode = DragMode.NONE
-                        },
-                        onDrag = { change, dragAmount ->
-                            if (isLocked || isMiniPlayer) return@detectDragGestures
-                            change.consume()
-                            
-                            if (dragMode == DragMode.NONE) {
-                                if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) + 2f) {
-                                    dragMode = DragMode.SEEK
-                                    dragSeekPosition = currentPosition
-                                } else if (kotlin.math.abs(dragAmount.y) > 2f) {
-                                    if (change.position.x < size.width / 2) {
-                                        dragMode = DragMode.BRIGHTNESS
-                                        val activity = context.findActivity()
-                                        dragBrightnessValue = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0 } ?: 0.5f
-                                    } else {
-                                        dragMode = DragMode.VOLUME
-                                        dragVolumeValue = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+                        detectDragGestures(
+                            onDragStart = { 
+                                dragMode = DragMode.NONE 
+                            },
+                            onDragEnd = {
+                                if (dragMode == DragMode.SEEK) {
+                                    Media3Manager.seekTo(dragSeekPosition)
+                                }
+                                dragMode = DragMode.NONE
+                            },
+                            onDragCancel = {
+                                dragMode = DragMode.NONE
+                            },
+                            onDrag = { change, dragAmount ->
+                                if (isLocked) return@detectDragGestures
+                                change.consume()
+                                
+                                if (dragMode == DragMode.NONE) {
+                                    if (kotlin.math.abs(dragAmount.x) > kotlin.math.abs(dragAmount.y) + 2f) {
+                                        dragMode = DragMode.SEEK
+                                        dragSeekPosition = currentPosition
+                                    } else if (kotlin.math.abs(dragAmount.y) > 2f) {
+                                        if (change.position.x < size.width / 2) {
+                                            dragMode = DragMode.BRIGHTNESS
+                                            val activity = context.findActivity()
+                                            dragBrightnessValue = activity?.window?.attributes?.screenBrightness?.takeIf { it >= 0 } ?: 0.5f
+                                        } else {
+                                            dragMode = DragMode.VOLUME
+                                            dragVolumeValue = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat()
+                                        }
                                     }
                                 }
-                            }
 
-                            when (dragMode) {
-                                DragMode.SEEK -> {
-                                    val seekDelta = (dragAmount.x / size.width) * 300000L
-                                    dragSeekPosition = (dragSeekPosition + seekDelta).toLong().coerceIn(0L, duration)
+                                when (dragMode) {
+                                    DragMode.SEEK -> {
+                                        val seekDelta = (dragAmount.x / size.width) * 300000L
+                                        dragSeekPosition = (dragSeekPosition + seekDelta).toLong().coerceIn(0L, duration)
+                                    }
+                                    DragMode.BRIGHTNESS -> {
+                                        val delta = -(dragAmount.y / size.height) * 1.2f
+                                        dragBrightnessValue = (dragBrightnessValue + delta).coerceIn(0f, 1f)
+                                        val activity = context.findActivity()
+                                        val attr = activity?.window?.attributes
+                                        attr?.screenBrightness = dragBrightnessValue
+                                        activity?.window?.attributes = attr
+                                    }
+                                    DragMode.VOLUME -> {
+                                        val delta = -(dragAmount.y / size.height) * maxVolume * 1.2f
+                                        dragVolumeValue = (dragVolumeValue + delta).coerceIn(0f, maxVolume.toFloat())
+                                        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, dragVolumeValue.toInt(), 0)
+                                    }
+                                    else -> {}
                                 }
-                                DragMode.BRIGHTNESS -> {
-                                    val delta = -(dragAmount.y / size.height) * 1.2f
-                                    dragBrightnessValue = (dragBrightnessValue + delta).coerceIn(0f, 1f)
-                                    val activity = context.findActivity()
-                                    val attr = activity?.window?.attributes
-                                    attr?.screenBrightness = dragBrightnessValue
-                                    activity?.window?.attributes = attr
-                                }
-                                DragMode.VOLUME -> {
-                                    val delta = -(dragAmount.y / size.height) * maxVolume * 1.2f
-                                    dragVolumeValue = (dragVolumeValue + delta).coerceIn(0f, maxVolume.toFloat())
-                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, dragVolumeValue.toInt(), 0)
-                                }
-                                else -> {}
                             }
-                        }
-                    )
-                }
+                        )
+                    }
+                )
         ) {
             AnimatedVisibility(
                 visible = isLongPressSpeedUp,
                 enter = fadeIn() + slideInVertically(initialOffsetY = { -it }),
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { -it }),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp)
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = if (isFullscreen) 60.dp else 40.dp)
             ) {
                 Row(
                     modifier = Modifier
@@ -482,22 +498,25 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                       // .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End)) else Modifier)
                         .padding(
-                            start = if (isFullscreen) 15.dp else 10.dp, 
-                            end = if (isFullscreen) 15.dp else 10.dp, 
+                            start = 10.dp, 
+                            end = if (isFullscreen) 20.dp else 10.dp, 
                             top = bottomPadding, 
                             bottom = if (isFullscreen) 5.dp else 10.dp, 
                         ),
-                    verticalAlignment = Alignment.Bottom // ★ 修改点1：Top栏内部元素底部对齐
+                    verticalAlignment = Alignment.Bottom 
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White,
-                        modifier = Modifier.size(topIconSize).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onFullscreenToggle?.invoke() } 
-                    )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    // ★ 修复：只在全屏时才显示返回图标
+                    if (isFullscreen) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White,
+                            modifier = Modifier.size(topIconSize).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onFullscreenToggle?.invoke() } 
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                    }
+                    
                     Text(
                         text = "$title $episodeName[$resolutionText]",
                         color = Color.White,
@@ -508,9 +527,9 @@ fun PlayViewsScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
-                    
+
                     Text(text = systemTime, color = Color.White, fontSize = timeTextSize, fontWeight = FontWeight.Bold)
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     
                     Icon(
                         imageVector = Icons.Default.Cast, 
@@ -523,9 +542,9 @@ fun PlayViewsScreen(
                             showCastDialog = true 
                         }
                     )
-
+                    
                     if (isFullscreen) {
-                       // Spacer(modifier = Modifier.width(16.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "More",
@@ -534,6 +553,41 @@ fun PlayViewsScreen(
                                 showMoreMenu = !showMoreMenu
                                 showSpeedMenu = false 
                             }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+                    val batteryWidth = if (isFullscreen) 28.dp else 22.dp
+                    val batteryHeight = if (isFullscreen) 14.dp else 11.dp
+                    val batteryFontSize = if (isFullscreen) 10.sp else 8.sp
+
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .size(width = batteryWidth, height = batteryHeight)
+                                .border(1.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(2.dp))
+                                .padding(1.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(batteryLevel / 100f)
+                                    .fillMaxHeight()
+                                    .align(Alignment.CenterStart)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(if (batteryLevel <= 20) Color.Red else Color.White)
+                            )
+                            Text(
+                                text = "$batteryLevel",
+                                color = if (batteryLevel > 40 && batteryLevel > 20) Color.Black else Color.White,
+                                fontSize = batteryFontSize,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(width = 2.dp, height = batteryHeight * 0.4f)
+                                .background(Color.White.copy(alpha = 0.8f), RoundedCornerShape(topEnd = 2.dp, bottomEnd = 2.dp))
                         )
                     }
                 }
@@ -591,14 +645,13 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                       // .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End)) else Modifier)
                         .padding(
                             start = if (isFullscreen) 15.dp else 10.dp, 
                             end = if (isFullscreen) 15.dp else 10.dp, 
                             top = if (isFullscreen) 5.dp else 10.dp, 
                             bottom = bottomPadding
                         ),
-                    verticalAlignment = Alignment.Top // ★ 修改点2：Bottom栏内部元素顶对齐
+                    verticalAlignment = Alignment.Top 
                 ) {
                     if (hasNextEpisode && !isMiniPlayer) {
                         Icon(
@@ -702,13 +755,26 @@ fun PlayViewsScreen(
                 exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
+                val episodes = playLists.getOrNull(selectedTabIndex)?.episodes ?: emptyList()
+                val displayEpisodes = if (isReversed) episodes.reversed() else episodes
+                val gridState = rememberLazyGridState()
+                
+                LaunchedEffect(showMoreMenu, selectedTabIndex, isReversed) {
+                    if (showMoreMenu) {
+                        val selectedIndex = displayEpisodes.indexOfFirst { it.name == episodeName }
+                        if (selectedIndex >= 0) {
+                            gridState.scrollToItem(selectedIndex)
+                        }
+                    }
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(if (isPhone) 260.dp else 360.dp) 
+                        .width(if (isPhysicalPhone) 300.dp else 400.dp) 
                         .background(Color.Black.copy(alpha = 0.85f))
                         .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End)) else Modifier)
-                        .padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 32.dp)
+                        .padding(start = 16.dp, end = 24.dp, bottom = 10.dp, top = 32.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -749,7 +815,7 @@ fun PlayViewsScreen(
                                 playLists.forEachIndexed { index, playList ->
                                     Box(
                                         modifier = Modifier
-                                            .height(if (isPhone) 32.dp else 40.dp)
+                                            .height(if (isPhysicalPhone) 32.dp else 40.dp)
                                             .selectable(
                                                 selected = selectedTabIndex == index,
                                                 interactionSource = remember { MutableInteractionSource() },
@@ -761,7 +827,7 @@ fun PlayViewsScreen(
                                     ) {
                                         Text(
                                             text = "${playList.sourceName}(${playList.episodes.size})",
-                                            fontSize = if (isPhone) 11.sp else 14.sp,
+                                            fontSize = if (isPhysicalPhone) 11.sp else 14.sp,
                                             fontWeight = FontWeight.SemiBold,
                                             color = if (selectedTabIndex == index) MaterialTheme.colorScheme.primary else Color.White
                                         )
@@ -781,12 +847,10 @@ fun PlayViewsScreen(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        val episodes = playLists.getOrNull(selectedTabIndex)?.episodes ?: emptyList()
-                        val displayEpisodes = if (isReversed) episodes.reversed() else episodes
-
                         key(selectedTabIndex, isReversed) {
                             LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = if (isPhone) 65.dp else 80.dp),
+                                state = gridState,
+                                columns = GridCells.Adaptive(minSize = if (isPhysicalPhone) 65.dp else 80.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                                 modifier = Modifier.fillMaxSize()
@@ -803,13 +867,13 @@ fun PlayViewsScreen(
                                                 shape = RoundedCornerShape(6.dp)
                                             )
                                             .clickable { onEpisodeSelected?.invoke(ep.url, ep.name) }
-                                            .padding(vertical = if (isPhone) 6.dp else 10.dp, horizontal = 4.dp),
+                                            .padding(vertical = if (isPhysicalPhone) 6.dp else 10.dp, horizontal = 4.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = ep.name,
                                             color = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
-                                            fontSize = if (isPhone) 10.sp else 12.sp,
+                                            fontSize = if (isPhysicalPhone) 10.sp else 12.sp,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
