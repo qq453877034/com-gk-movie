@@ -32,8 +32,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView // ★ 新增
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat // ★ 新增
+import androidx.core.view.WindowInsetsCompat // ★ 新增
+import androidx.core.view.WindowInsetsControllerCompat // ★ 新增
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gk.movie.Utils.Media3Play.Util.Media3Manager
 import com.gk.movie.Utils.Media3Play.Util.VideoSniffer
@@ -101,13 +105,28 @@ fun MovieContent(movieInfo: MovieInfo) {
         isFullscreen = false
     }
 
+    val view = LocalView.current
+    // ★ 核心升级：控制全屏时的系统沉浸式体验 (隐藏状态栏和导航小白条)
     LaunchedEffect(isFullscreen) {
+        val window = activity?.window
         if (isFullscreen) {
             if (!isExpandedScreen) {
                 activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             }
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                // 隐藏所有的系统状态栏和底部导航栏
+                insetsController.hide(WindowInsetsCompat.Type.systemBars())
+                // 设置为滑动边缘短时显示 (沉浸式模式)
+                insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
         } else {
             activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                // 退出全屏，重新显示状态栏和小白条
+                insetsController.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
@@ -165,6 +184,7 @@ fun MovieContent(movieInfo: MovieInfo) {
             url = realVideoUrl!!,
             title = movieInfo.title,
             episodeName = selectedEpisodeName,
+            coverUrl = movieInfo.coverUrl, 
             isMiniPlayer = false,
             isFullscreen = true,
             hasNextEpisode = hasNextEpisode,
@@ -206,6 +226,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                             url = realVideoUrl!!,
                             title = movieInfo.title,
                             episodeName = selectedEpisodeName,
+                            coverUrl = movieInfo.coverUrl,
                             isMiniPlayer = false,
                             isFullscreen = false,
                             hasNextEpisode = hasNextEpisode,
@@ -331,6 +352,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                         url = realVideoUrl!!,
                                         title = movieInfo.title,
                                         episodeName = selectedEpisodeName,
+                                        coverUrl = movieInfo.coverUrl,
                                         isMiniPlayer = false,
                                         isFullscreen = false,
                                         hasNextEpisode = hasNextEpisode,
@@ -415,6 +437,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                         url = url,
                         title = movieInfo.title,
                         episodeName = selectedEpisodeName,
+                        coverUrl = movieInfo.coverUrl,
                         isMiniPlayer = true,
                         isFullscreen = false,
                         hasNextEpisode = hasNextEpisode,

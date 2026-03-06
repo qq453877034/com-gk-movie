@@ -405,7 +405,7 @@ fun PlayListGrid(
     val displayEpisodes = if (isReversed) currentEpisodes.reversed() else currentEpisodes
 
     BoxWithConstraints(modifier = modifier) {
-        val minColumnWidth = 80f 
+        val minColumnWidth = 70f 
         val spacing = 6f         
         val columns = maxOf(1, ((maxWidth.value + spacing) / (minColumnWidth + spacing)).toInt())
         
