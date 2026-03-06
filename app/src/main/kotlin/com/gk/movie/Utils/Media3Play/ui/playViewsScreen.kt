@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -86,8 +88,8 @@ fun PlayViewsScreen(
     val topTextSize = if (isPhonePortrait) 13.sp else 16.sp
     val timeTextSize = if (isPhonePortrait) 11.sp else 13.sp
 
-    val centerIconSize = if (isMiniPlayer) 24.dp else if (isPhonePortrait) 32.dp else 48.dp
-    val centerBgPadding = if (isMiniPlayer) 6.dp else if (isPhonePortrait) 10.dp else 16.dp
+    val centerIconSize = if (isMiniPlayer) 24.dp else if (isPhonePortrait) 30.dp else 48.dp
+    val centerBgPadding = if (isMiniPlayer) 6.dp else if (isPhonePortrait) 8.dp else 16.dp
 
     val lockIconSize = if (isPhonePortrait) 18.dp else 24.dp
     val lockBgPadding = if (isPhonePortrait) 8.dp else 12.dp
@@ -126,7 +128,6 @@ fun PlayViewsScreen(
         }
     }
 
-    // ★ 核心修复1：直接从底层播放器读取初始状态，而不是赋予 0 或 false
     var isPlaying by remember { mutableStateOf(player.isPlaying) }
     var currentPosition by remember { mutableLongStateOf(player.currentPosition) }
     var duration by remember { mutableLongStateOf(if (player.duration == C.TIME_UNSET) 0L else player.duration) }
@@ -134,7 +135,6 @@ fun PlayViewsScreen(
     var showControls by remember { mutableStateOf(true) } 
     var isLocked by remember { mutableStateOf(false) } 
     var resolutionText by remember { mutableStateOf("解析中") }
-    // 同样，倍速也要拿底层的真实倍速
     var playbackSpeed by remember { mutableFloatStateOf(player.playbackParameters.speed) }
     
     var showSpeedMenu by remember { mutableStateOf(false) }
@@ -149,12 +149,11 @@ fun PlayViewsScreen(
     }
 
     val speedOptions = listOf(
-        "极速(X32)" to 32.0f, "X6" to 6.0f, "X3" to 3.0f, "X2" to 2.0f,
+        "X8" to 8.0f, "X6" to 6.0f, "X4" to 4.0f, "X2" to 2.0f,
         "X1.5" to 1.5f, "X1.25" to 1.25f, "默认" to 1.0f,  "X0.5" to 0.5f
     )
 
     DisposableEffect(player) {
-        // ★ 核心修复2：即使 UI 被重组（旋转屏幕或小窗），也立即同步一次底层数据，防止 00:00 BUG
         isPlaying = player.isPlaying
         val d = player.duration
         duration = if (d == C.TIME_UNSET) 0L else d
@@ -194,7 +193,7 @@ fun PlayViewsScreen(
 
     LaunchedEffect(showControls, isPlaying, isLocked, showSpeedMenu, showMoreMenu, isSeeking) {
         if (showControls && isPlaying && !showSpeedMenu && !showMoreMenu && !isSeeking) {
-            delay(4000L)
+            delay(4500L)
             showControls = false
         }
     }
@@ -233,8 +232,8 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)
-                        .padding(horizontal = 10.dp, vertical = bottomPadding),
+                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal )) else Modifier)
+                        .padding(start = 10.dp, end = 10.dp, top = if (isFullscreen) 4.dp else bottomPadding, bottom = bottomPadding),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -407,12 +406,13 @@ fun PlayViewsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(60.dp)
+                        .width(70.dp)
                         .background(Color.Black.copy(alpha = 0.85f))
                         .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End)) else Modifier)
-                        .padding(vertical = 8.dp),
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceEvenly
+                    verticalArrangement = Arrangement.Top
                 ) {
                     speedOptions.forEach { (label, speedVal) ->
                         Text(
@@ -427,7 +427,7 @@ fun PlayViewsScreen(
                                     Media3Manager.setPlaybackSpeed(speedVal)
                                     showSpeedMenu = false
                                 }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 12.dp),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
                     }

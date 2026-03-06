@@ -234,6 +234,11 @@ fun MovieContent(movieInfo: MovieInfo) {
             }
 
             Column(modifier = Modifier.weight(0.4f)) {
+                if (isPlaying && selectedEpisodeUrl != null) {
+                    MovieHeaderInfo(movieInfo, isExpandedScreen = false, handlePlayClick)
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+
                 if (movieInfo.playLists.isNotEmpty()) {
                     PlayListHeader(
                         playLists = movieInfo.playLists,

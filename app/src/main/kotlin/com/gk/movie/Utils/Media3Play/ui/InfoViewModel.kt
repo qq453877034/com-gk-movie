@@ -11,12 +11,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import okhttp3.Request
 import org.jsoup.Jsoup
+import java.io.File
 import kotlin.math.min
 
 class InfoViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow<UiState>(UiState.Loading)
     val uiState: StateFlow<UiState> = _uiState
+
+    // ★ 调试开关：true = 读取本地文件，false = 发起真实网络请求
+    private val isDebugLocalMode = true
+    // ★ 本地测试文件的绝对路径
+    private val localFilePath = "/storage/emulated/0/Alarms/信息页.html"
 
     init {
         // 传入新站点的测试地址
@@ -26,16 +32,32 @@ class InfoViewModel : ViewModel() {
     private fun fetchMovieInfo(url: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 网络请求获取 HTML (使用了下方的 OkhttpManager)
-                val request = Request.Builder().url(url).build()
-                val response = OkhttpManager.client.newCall(request).execute()
-                
-                if (!response.isSuccessful) {
-                    _uiState.value = UiState.Error("网络请求失败: ${response.code}")
-                    return@launch
+                val html: String
+
+                if (isDebugLocalMode) {
+                    // ================= 调试模式：读取本地 HTML =================
+                    val file = File(localFilePath)
+                    if (!file.exists()) {
+                        _uiState.value = UiState.Error("本地测试文件不存在，请检查路径:\n$localFilePath")
+                        return@launch
+                    }
+                    html = file.readText(Charsets.UTF_8)
+                    Log.d("InfoViewModel", "成功加载本地测试 HTML: ${file.length()} bytes")
+                    
+                    // 模拟一下网络延迟（可选，如果你想测试骨架屏加载动画，可以取消下面这行的注释）
+                    // kotlinx.coroutines.delay(1000) 
+                } else {
+                    // ================= 生产模式：发起网络请求 =================
+                    val request = Request.Builder().url(url).build()
+                    val response = OkhttpManager.client.newCall(request).execute()
+                    
+                    if (!response.isSuccessful) {
+                        _uiState.value = UiState.Error("网络请求失败: ${response.code}")
+                        return@launch
+                    }
+                    html = response.body?.string() ?: ""
                 }
-                
-                val html = response.body?.string() ?: ""
+
                 val doc = Jsoup.parse(html)
 
                 // 1. 优先使用 head 里的 meta 标签精准获取信息，防止出错
@@ -105,7 +127,7 @@ class InfoViewModel : ViewModel() {
                 _uiState.value = UiState.Success(movieInfo)
 
             } catch (e: Exception) {
-                Log.e("InfoViewModel", "解析失败", e)
+                Log.e("InfoViewModel", "解析异常", e)
                 _uiState.value = UiState.Error("解析异常: ${e.message}")
             }
         }
