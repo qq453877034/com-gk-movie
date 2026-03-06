@@ -1,65 +1,50 @@
 {
   "allFiles": [
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/InfoScreenComponents.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/build.gradle.kts",
       "selection": {
         "end": {
           "column": 0,
-          "index": 0,
-          "line": 0
+          "index": 4597,
+          "line": 170
         },
         "start": {
           "column": 0,
-          "index": 0,
-          "line": 0
+          "index": 4597,
+          "line": 170
         }
       }
     },
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/infoScreen.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/gradle/libs.versions.toml",
       "selection": {
         "end": {
-          "column": 1,
-          "index": 19754,
-          "line": 438
+          "column": 0,
+          "index": 334,
+          "line": 16
         },
         "start": {
-          "column": 1,
-          "index": 19754,
-          "line": 438
+          "column": 0,
+          "index": 334,
+          "line": 16
         }
       }
     },
     {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt",
+      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/proguard-rules.pro",
       "selection": {
         "end": {
-          "column": 1,
-          "index": 31533,
-          "line": 657
+          "column": 33,
+          "index": 856,
+          "line": 24
         },
         "start": {
-          "column": 1,
-          "index": 31533,
-          "line": 657
-        }
-      }
-    },
-    {
-      "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/InfoViewModel.kt",
-      "selection": {
-        "end": {
-          "column": 1,
-          "index": 5748,
-          "line": 134
-        },
-        "start": {
-          "column": 1,
-          "index": 5748,
-          "line": 134
+          "column": 33,
+          "index": 856,
+          "line": 24
         }
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/proguard-rules.pro"
 }

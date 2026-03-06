@@ -19,3 +19,7 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# 忽略 Jsoup 内部对可选依赖 re2j 的警告，防止 R8 报错
+-dontwarn com.google.re2j.Matcher
+-dontwarn com.google.re2j.Pattern
