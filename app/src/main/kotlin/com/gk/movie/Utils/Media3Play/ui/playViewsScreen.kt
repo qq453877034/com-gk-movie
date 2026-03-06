@@ -82,22 +82,24 @@ fun PlayViewsScreen(
     val tvPlaybackEnded by castViewModel.tvPlaybackEnded.collectAsState()
 
     val configuration = LocalConfiguration.current
-    val isPhonePortrait = !isFullscreen && !isMiniPlayer && configuration.screenWidthDp < 840
+    
+    val isPhone = configuration.smallestScreenWidthDp < 600
+    val useCompactUI = isMiniPlayer || isPhone || (!isFullscreen && configuration.screenWidthDp < 840)
 
-    val topIconSize = if (isPhonePortrait) 20.dp else 24.dp
-    val topTextSize = if (isPhonePortrait) 13.sp else 16.sp
-    val timeTextSize = if (isPhonePortrait) 11.sp else 13.sp
+    val topIconSize = if (useCompactUI) 20.dp else 24.dp
+    val topTextSize = if (useCompactUI) 13.sp else 16.sp
+    val timeTextSize = if (useCompactUI) 11.sp else 13.sp
 
-    val centerIconSize = if (isMiniPlayer) 24.dp else if (isPhonePortrait) 30.dp else 48.dp
-    val centerBgPadding = if (isMiniPlayer) 6.dp else if (isPhonePortrait) 8.dp else 16.dp
+    val centerIconSize = if (isMiniPlayer) 24.dp else if (useCompactUI) 30.dp else 48.dp
+    val centerBgPadding = if (isMiniPlayer) 6.dp else if (useCompactUI) 8.dp else 16.dp
 
-    val lockIconSize = if (isPhonePortrait) 18.dp else 24.dp
-    val lockBgPadding = if (isPhonePortrait) 8.dp else 12.dp
+    val lockIconSize = if (useCompactUI) 18.dp else 24.dp
+    val lockBgPadding = if (useCompactUI) 8.dp else 12.dp
 
-    val bottomIconSize = if (isMiniPlayer) 16.dp else if (isPhonePortrait) 20.dp else 28.dp
-    val bottomTextSize = if (isMiniPlayer) 8.sp else if (isPhonePortrait) 11.sp else 13.sp
-    val bottomPadding = if (isMiniPlayer) 4.dp else if (isPhonePortrait) 8.dp else 16.dp
-    val bottomSpaced = if (isMiniPlayer) 8.dp else if (isPhonePortrait) 12.dp else 20.dp
+    val bottomIconSize = if (isMiniPlayer) 16.dp else if (useCompactUI) 20.dp else 28.dp
+    val bottomTextSize = if (isMiniPlayer) 8.sp else if (useCompactUI) 11.sp else 13.sp
+    val bottomPadding = if (isMiniPlayer) 4.dp else if (useCompactUI) 8.dp else 16.dp
+    val bottomSpaced = if (isMiniPlayer) 8.dp else if (useCompactUI) 12.dp else 20.dp
 
     var wasPlaying by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -232,8 +234,14 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal )) else Modifier)
-                        .padding(start = 10.dp, end = 10.dp, top = if (isFullscreen) 4.dp else bottomPadding, bottom = bottomPadding),
+                        // ★ 完全移除 Insets 规避，使得左侧 Back 图标完全贴边。
+                        // 全屏时右侧 (end) 额外增加 32.dp 边距，规避右侧挖孔且拉开距离
+                        .padding(
+                            start = 10.dp, 
+                            end = if (isFullscreen) 32.dp else 10.dp, 
+                            top = if (isFullscreen) 4.dp else bottomPadding, 
+                            bottom = bottomPadding
+                        ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -314,7 +322,7 @@ fun PlayViewsScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Start)) else Modifier)
+                        // ★ 这里也去掉了 Insets 规避，让锁屏按钮和上下的按钮保持左对齐
                         .padding(start = bottomSpaced)
                         .clip(CircleShape)
                         .background(if (isLocked) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.4f))
@@ -335,8 +343,13 @@ fun PlayViewsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color.Black.copy(alpha = 0.5f))
-                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)) else Modifier)
-                        .padding(horizontal = bottomSpaced, vertical = bottomPadding),
+                        // ★ 完全移除 Insets 规避，Next Episode 贴边。全屏时右侧 (end) 额外增加 32.dp 给 Fullscreen 留足空间
+                        .padding(
+                            start = bottomSpaced, 
+                            end = if (isFullscreen) 32.dp else bottomSpaced, 
+                            top = bottomPadding, 
+                            bottom = bottomPadding
+                        ),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (hasNextEpisode && !isMiniPlayer) {
@@ -443,9 +456,9 @@ fun PlayViewsScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .width(360.dp) 
+                        .width(if (isPhone) 260.dp else 360.dp) 
                         .background(Color.Black.copy(alpha = 0.85f))
-                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End + WindowInsetsSides.Top + WindowInsetsSides.Bottom)) else Modifier)
+                        .then(if (isFullscreen) Modifier.windowInsetsPadding(safeInsets.only(WindowInsetsSides.End)) else Modifier)
                         .padding(10.dp)
                 ) {
                     Row(

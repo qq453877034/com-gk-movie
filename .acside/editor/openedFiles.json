@@ -35,13 +35,13 @@
       "selection": {
         "end": {
           "column": 1,
-          "index": 31317,
-          "line": 644
+          "index": 31533,
+          "line": 657
         },
         "start": {
           "column": 1,
-          "index": 31317,
-          "line": 644
+          "index": 31533,
+          "line": 657
         }
       }
     },
@@ -61,5 +61,5 @@
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/infoScreen.kt"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Media3Play/ui/playViewsScreen.kt"
 }
