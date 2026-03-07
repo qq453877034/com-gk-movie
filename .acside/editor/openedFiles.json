@@ -19,14 +19,14 @@
       "file": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Category/ui/infoCategoryScreen.kt",
       "selection": {
         "end": {
-          "column": 1,
-          "index": 28042,
-          "line": 508
+          "column": 45,
+          "index": 2703,
+          "line": 61
         },
         "start": {
-          "column": 1,
-          "index": 28042,
-          "line": 508
+          "column": 45,
+          "index": 2703,
+          "line": 61
         }
       }
     },
@@ -76,5 +76,5 @@
       }
     }
   ],
-  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Category/ui/InfoScreenSkeleton.kt"
+  "selectedFile": "/storage/emulated/0/AndroidIDEProjects/GKMovie/app/src/main/kotlin/com/gk/movie/Utils/Category/ui/infoCategoryScreen.kt"
 }

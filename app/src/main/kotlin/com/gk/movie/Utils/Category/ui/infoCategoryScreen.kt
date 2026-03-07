@@ -59,7 +59,7 @@ fun InfoCategoryScreen(
     val isCompactWindow = configuration.screenWidthDp < 600
     val isPhoneDevice = configuration.smallestScreenWidthDp < 600
 
-    val scaleFactor = if (isPhoneDevice) 0.8f else 1f
+    val scaleFactor = if (isPhoneDevice) 0.85f else 1f
     val currentDensity = LocalDensity.current
     val customDensity = Density(
         density = currentDensity.density * scaleFactor,
@@ -69,223 +69,168 @@ fun InfoCategoryScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
+    var cachedSuccessState by remember { mutableStateOf<CategoryUiState.Success?>(null) }
+    LaunchedEffect(uiState) {
+        if (uiState is CategoryUiState.Success) {
+            cachedSuccessState = uiState as CategoryUiState.Success
+        }
+    }
+
+    val displayState = (uiState as? CategoryUiState.Success) ?: cachedSuccessState
+    val isLoading = uiState is CategoryUiState.Loading
+    val isInitialLoading = isLoading && cachedSuccessState == null
+
     CompositionLocalProvider(LocalDensity provides customDensity) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                when (uiState) {
-                    is CategoryUiState.Success -> {
-                        val title = (uiState as CategoryUiState.Success).data.pageTitle
-                        Surface(
-                            color = MaterialTheme.colorScheme.background, 
-                            modifier = Modifier.fillMaxWidth()
+                if (displayState != null) {
+                    val title = displayState.data.pageTitle
+                    Surface(
+                        color = MaterialTheme.colorScheme.background, 
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding() 
+                                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp), 
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            if (!isCompactWindow) {
+                                Text(
+                                    text = "${title}分类",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    letterSpacing = 1.sp,
+                                    modifier = Modifier.padding(end = 16.dp)
+                                )
+                            }
+                            
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding() 
-                                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp), 
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
+                                modifier = Modifier.weight(1f) 
                             ) {
-                                if (!isCompactWindow) {
-                                    Text(
-                                        text = "${title}分类",
-                                        style = MaterialTheme.typography.headlineMedium,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        letterSpacing = 1.sp,
-                                        modifier = Modifier.padding(end = 16.dp)
-                                    )
-                                }
-                                
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
-                                    modifier = Modifier.weight(1f) 
+                                val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
+                                Box(
+                                    modifier = searchBarModifier
+                                        .height(40.dp) 
+                                        .clip(RoundedCornerShape(100.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                                    contentAlignment = Alignment.CenterStart
                                 ) {
-                                    val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
-                                    
-                                    Box(
-                                        modifier = searchBarModifier
-                                            .height(40.dp) 
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .background(MaterialTheme.colorScheme.surfaceVariant),
-                                        contentAlignment = Alignment.CenterStart
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.padding(horizontal = 12.dp)
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.padding(horizontal = 12.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Rounded.Search,
-                                                contentDescription = "Search",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            
-                                            BasicTextField(
-                                                value = searchQuery,
-                                                onValueChange = { searchQuery = it },
-                                                singleLine = true,
-                                                textStyle = TextStyle(
-                                                    fontSize = 14.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface
-                                                ),
-                                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                                keyboardActions = KeyboardActions(
-                                                    onSearch = { Log.d("CategoryScreen", "触发搜索: $searchQuery") }
-                                                ),
-                                                decorationBox = { innerTextField ->
-                                                    if (searchQuery.isEmpty()) {
-                                                        Text(
-                                                            text = "搜索热播影片...",
-                                                            fontSize = 14.sp,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                                        )
-                                                    }
-                                                    innerTextField()
-                                                },
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.width(8.dp)) 
-
-                                    IconButton(onClick = { /* TODO: 跳转历史 */ }) {
-                                        Icon(Icons.Rounded.History, contentDescription = "历史记录", tint = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                    IconButton(onClick = { /* TODO: 跳转收藏 */ }) {
-                                        Icon(Icons.Rounded.FavoriteBorder, contentDescription = "我的收藏", tint = MaterialTheme.colorScheme.onSurface)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    is CategoryUiState.Loading -> {
-                        Surface(
-                            color = MaterialTheme.colorScheme.background, 
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .statusBarsPadding() 
-                                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                if (!isCompactWindow) {
-                                    // ★ 还原为真实的尺寸: 120 x 36
-                                    Box(modifier = Modifier.width(120.dp).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                }
-                                
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
-                                    
-                                    Box(
-                                        modifier = searchBarModifier
-                                            // ★ 还原为真实的尺寸: 40
-                                            .height(40.dp)
-                                            .clip(RoundedCornerShape(100.dp))
-                                            .shimmerEffect()
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    repeat(2) {
-                                        // ★ 还原为真实的尺寸: 36
-                                        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
+                                        Icon(
+                                            imageVector = Icons.Rounded.Search,
+                                            contentDescription = "Search",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
                                         Spacer(modifier = Modifier.width(8.dp))
+                                        BasicTextField(
+                                            value = searchQuery,
+                                            onValueChange = { searchQuery = it },
+                                            singleLine = true,
+                                            textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface),
+                                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                            keyboardActions = KeyboardActions(onSearch = { Log.d("CategoryScreen", "触发搜索: $searchQuery") }),
+                                            decorationBox = { innerTextField ->
+                                                if (searchQuery.isEmpty()) {
+                                                    Text(text = "搜索热播影片...", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                                                }
+                                                innerTextField()
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
+                                }
+                                Spacer(modifier = Modifier.width(8.dp)) 
+                                IconButton(onClick = { /* TODO */ }) { Icon(Icons.Rounded.History, contentDescription = "历史记录", tint = MaterialTheme.colorScheme.onSurface) }
+                                IconButton(onClick = { /* TODO */ }) { Icon(Icons.Rounded.FavoriteBorder, contentDescription = "我的收藏", tint = MaterialTheme.colorScheme.onSurface) }
+                            }
+                        }
+                    }
+                } else if (isInitialLoading) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.background, 
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .statusBarsPadding() 
+                                .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (!isCompactWindow) {
+                                Box(modifier = Modifier.width(120.dp).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
+                                Spacer(modifier = Modifier.width(16.dp))
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
+                                Box(modifier = searchBarModifier.height(40.dp).clip(RoundedCornerShape(100.dp)).shimmerEffect())
+                                Spacer(modifier = Modifier.width(8.dp))
+                                repeat(2) {
+                                    Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
                             }
                         }
                     }
-                    else -> {}
                 }
             },
             bottomBar = {
-                when (uiState) {
-                    is CategoryUiState.Success -> {
-                        val data = (uiState as CategoryUiState.Success).data
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant, 
-                            shadowElevation = 8.dp,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            PaginationBar(
-                                pageItems = data.pageItems,
-                                pageTips = data.pageTips,
-                                onPageClick = { url -> 
-                                    viewModel.fetchCategoryData(url) 
-                                    coroutineScope.launch {
-                                        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1) 
-                                    }
-                                },
-                                modifier = Modifier.navigationBarsPadding(),
-                                isCompactWindow = isCompactWindow
-                            )
-                        }
-                    }
-                    is CategoryUiState.Loading -> {
-                        Surface(
-                            color = MaterialTheme.colorScheme.surfaceVariant, 
-                            shadowElevation = 8.dp,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .navigationBarsPadding()
-                                    .padding(vertical = 12.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                // ★ 还原真实文字大致尺寸
-                                Box(modifier = Modifier.width(150.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                ) {
-                                    // ★ 还原真实分页按钮尺寸：高度 36
-                                    if (isCompactWindow) {
-                                        listOf(56.dp, 70.dp, 70.dp, 56.dp).forEach { w ->
-                                            Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                        }
-                                    } else {
-                                        listOf(56.dp, 70.dp, 36.dp, 36.dp, 36.dp, 36.dp, 46.dp, 70.dp, 56.dp).forEach { w ->
-                                            Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                        }
-                                    }
+                // ★ 终极优化：彻底移除底部的呼吸灯骨架逻辑。只要有缓存数据，就直接展示真实的分页栏！
+                if (displayState != null) {
+                    val data = displayState.data
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant, 
+                        shadowElevation = 8.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        PaginationBar(
+                            pageItems = data.pageItems,
+                            pageTips = data.pageTips,
+                            onPageClick = { url -> 
+                                viewModel.fetchCategoryData(url) 
+                                coroutineScope.launch {
+                                    if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1) 
                                 }
-                            }
-                        }
+                            },
+                            modifier = Modifier.navigationBarsPadding(),
+                            isCompactWindow = isCompactWindow,
+                            isLoading = isLoading // ★ 传入 Loading 状态，防止网络请求时用户狂点下一页
+                        )
                     }
-                    else -> {}
                 }
             }
         ) { innerPadding ->
-            when (uiState) {
-                is CategoryUiState.Loading -> {
+            when {
+                isInitialLoading -> {
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
                         CategorySkeletonScreen(listState = listState)
                     }
                 }
-                is CategoryUiState.Error -> {
+                uiState is CategoryUiState.Error && displayState == null -> {
                     val message = (uiState as CategoryUiState.Error).message
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = message, color = MaterialTheme.colorScheme.error)
                     }
                 }
-                is CategoryUiState.Success -> {
-                    val data = (uiState as CategoryUiState.Success).data
+                displayState != null -> {
+                    val data = displayState.data
                     
                     BoxWithConstraints(
                         modifier = Modifier
@@ -377,21 +322,53 @@ fun InfoCategoryScreen(
                                 }
                             }
 
-                            items(data.movies.chunked(columns)) { rowMovies ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    for (movie in rowMovies) {
-                                        Box(modifier = Modifier.weight(1f)) {
-                                            MovieItemCard(movie = movie, onClick = { onMovieClick(movie.detailUrl) })
+                            if (uiState is CategoryUiState.Error) {
+                                item {
+                                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
+                                        Text(text = (uiState as CategoryUiState.Error).message, color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            } else if (isLoading) {
+                                items(6) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        repeat(columns) {
+                                            Card(
+                                                modifier = Modifier.weight(1f),
+                                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                            ) {
+                                                Column {
+                                                    Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).shimmerEffect())
+                                                    Column(modifier = Modifier.padding(8.dp)) {
+                                                        Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
-                                    val emptySpaces = columns - rowMovies.size
-                                    repeat(emptySpaces) {
-                                        Spacer(modifier = Modifier.weight(1f))
+                                }
+                            } else {
+                                items(data.movies.chunked(columns)) { rowMovies ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        for (movie in rowMovies) {
+                                            Box(modifier = Modifier.weight(1f)) {
+                                                MovieItemCard(movie = movie, onClick = { onMovieClick(movie.detailUrl) })
+                                            }
+                                        }
+                                        val emptySpaces = columns - rowMovies.size
+                                        repeat(emptySpaces) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
                                     }
                                 }
                             }
@@ -409,7 +386,8 @@ fun PaginationBar(
     pageTips: String, 
     onPageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isCompactWindow: Boolean
+    isCompactWindow: Boolean,
+    isLoading: Boolean // ★ 接收加载状态
 ) {
     val displayPageItems = if (isCompactWindow) {
         pageItems.filter { item ->
@@ -447,7 +425,8 @@ fun PaginationBar(
                     modifier = Modifier
                         .height(36.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .clickable(enabled = !item.isDisabled && !item.isActive) { onPageClick(item.url) }
+                        // ★ 网络请求中自动禁用点击，防止多次触发重复请求
+                        .clickable(enabled = !item.isDisabled && !item.isActive && !isLoading) { onPageClick(item.url) }
                 ) {
                     Box(modifier = Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
                         Text(text = item.title, fontSize = 14.sp, fontWeight = if (item.isActive) FontWeight.Bold else FontWeight.Normal)
