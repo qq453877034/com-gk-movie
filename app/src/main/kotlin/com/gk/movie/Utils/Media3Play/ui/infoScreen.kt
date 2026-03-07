@@ -53,6 +53,38 @@ fun Context.findActivity(): Activity? {
     return null
 }
 
+// ★ 新增：中文数字解析器（支持 "第一集", "十一集", "第一百零二集" 等）
+fun parseChineseNumber(chineseStr: String): Int {
+    val map = mapOf('零' to 0, '一' to 1, '二' to 2, '两' to 2, '三' to 3, '四' to 4, '五' to 5, '六' to 6, '七' to 7, '八' to 8, '九' to 9)
+    val units = mapOf('十' to 10, '百' to 100, '千' to 1000)
+    var result = 0
+    var temp = 0
+    var valid = false
+    for (char in chineseStr) {
+        if (map.containsKey(char)) {
+            temp = map[char]!!
+            valid = true
+        } else if (units.containsKey(char)) {
+            val unit = units[char]!!
+            if (temp == 0) temp = 1 // 针对 "十一" 这种情况，前面没有数字默认为 1
+            result += temp * unit
+            temp = 0
+            valid = true
+        }
+    }
+    result += temp
+    return if (valid) result else -1
+}
+
+// ★ 新增：提取剧中数字集数（优先阿拉伯，其次中文）
+fun extractEpisodeNumbers(name: String): List<Int> {
+    val arabic = Regex("\\d+").findAll(name).mapNotNull { it.value.toIntOrNull() }.toList()
+    if (arabic.isNotEmpty()) return arabic
+    
+    val chinesePattern = Regex("[零一二三四五六七八九十百千两]+")
+    return chinesePattern.findAll(name).map { parseChineseNumber(it.value) }.filter { it != -1 }.toList()
+}
+
 @Composable
 fun InfoScreen(viewModel: InfoViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
@@ -141,34 +173,66 @@ fun MovieContent(movieInfo: MovieInfo) {
             selectedEpisodeName = firstEp?.name ?: "" 
         }
         if (selectedEpisodeUrl != null) {
-            if (realVideoUrl == null) isSniffing = true // ★ 修复：立刻呈现加载状态
+            if (realVideoUrl == null) isSniffing = true 
             isPlaying = true
         }
     }
     
-    val hasNextEpisode by remember(movieInfo.playLists, selectedTabIndex, selectedEpisodeUrl) {
+    // ★ 智能推算“下一集”逻辑（全面支持阿拉伯数字与中文数字）
+    val nextEpisode by remember(movieInfo.playLists, selectedTabIndex, selectedEpisodeUrl) {
         derivedStateOf {
-            if (movieInfo.playLists.isEmpty() || selectedEpisodeUrl == null) return@derivedStateOf false
-            val currentList = movieInfo.playLists.getOrNull(selectedTabIndex) ?: return@derivedStateOf false
-            val currentIndex = currentList.episodes.indexOfFirst { it.url == selectedEpisodeUrl }
-            currentIndex != -1 && currentIndex < currentList.episodes.size - 1
+            if (movieInfo.playLists.isEmpty() || selectedEpisodeUrl == null) return@derivedStateOf null
+            val currentList = movieInfo.playLists.getOrNull(selectedTabIndex) ?: return@derivedStateOf null
+            val episodes = currentList.episodes
+            val currentIndex = episodes.indexOfFirst { it.url == selectedEpisodeUrl }
+            if (currentIndex == -1) return@derivedStateOf null
+
+            // 1. 判断是否为非剧集列表（比如画质、语言）
+            val nonEpisodicKeywords = listOf("国语", "粤语", "英语", "中字", "原版", "正片", "蓝光", "超清", "高清", "标清", "1080", "720", "4k", "4K", "TC", "TS", "BD", "HD")
+            val episodicKeywords = listOf("集", "话", "期", "篇", "章", "季")
+            
+            val hasEpisodicKeyword = episodes.any { ep -> episodicKeywords.any { ep.name.contains(it) } }
+            
+            // 如果列表比较短，且全部包含画质/语言关键字，则判定不是剧集，隐藏下一集
+            val isQualityOrLangList = episodes.size <= 6 && !hasEpisodicKeyword && episodes.all { ep ->
+                nonEpisodicKeywords.any { ep.name.contains(it, ignoreCase = true) } || ep.name.contains("预告") || ep.name == "正片"
+            }
+
+            if (isQualityOrLangList) return@derivedStateOf null
+
+            // 2. 探明列表是升序还是降序（通过头尾数字大小对比，支持中文+阿拉伯）
+            var isAscending = true
+            if (episodes.isNotEmpty()) {
+                val firstNums = extractEpisodeNumbers(episodes.first().name)
+                val lastNums = extractEpisodeNumbers(episodes.last().name)
+                
+                for (i in 0 until kotlin.math.min(firstNums.size, lastNums.size)) {
+                    if (firstNums[i] > lastNums[i]) {
+                        isAscending = false
+                        break
+                    } else if (firstNums[i] < lastNums[i]) {
+                        isAscending = true
+                        break
+                    }
+                }
+            }
+
+            // 3. 计算真正的下一集 Index
+            val nextIndex = if (isAscending) currentIndex + 1 else currentIndex - 1
+            if (nextIndex in episodes.indices) episodes[nextIndex] else null
         }
     }
 
-    val handleNextEpisode = {
-        if (movieInfo.playLists.isNotEmpty() && selectedEpisodeUrl != null) {
-            val currentList = movieInfo.playLists.getOrNull(selectedTabIndex)
-            if (currentList != null) {
-                val currentIndex = currentList.episodes.indexOfFirst { it.url == selectedEpisodeUrl }
-                if (currentIndex != -1 && currentIndex < currentList.episodes.size - 1) {
-                    val nextEp = currentList.episodes[currentIndex + 1]
-                    selectedEpisodeUrl = nextEp.url
-                    selectedEpisodeName = nextEp.name
-                    realVideoUrl = null 
-                    isSniffing = true // ★ 修复：立刻呈现加载状态
-                    isPlaying = true
-                }
-            }
+    val hasNextEpisode = nextEpisode != null
+
+    // ★ 修复编译错误：明确指定 Lambda 类型为 () -> Unit
+    val handleNextEpisode: () -> Unit = {
+        nextEpisode?.let { nextEp ->
+            selectedEpisodeUrl = nextEp.url
+            selectedEpisodeName = nextEp.name
+            realVideoUrl = null 
+            isSniffing = true 
+            isPlaying = true
         }
     }
 
@@ -206,13 +270,12 @@ fun MovieContent(movieInfo: MovieInfo) {
                     selectedEpisodeUrl = url
                     selectedEpisodeName = name
                     realVideoUrl = null
-                    isSniffing = true // ★ 修复
+                    isSniffing = true 
                     isPlaying = true 
                 },
                 modifier = Modifier.fillMaxSize().background(Color.Black)
             )
         } else {
-            // 全屏时的加载态
             Box(
                 modifier = Modifier.fillMaxSize().background(Color.Black),
                 contentAlignment = Alignment.Center
@@ -237,7 +300,6 @@ fun MovieContent(movieInfo: MovieInfo) {
             ) {
                 if (isPlaying && selectedEpisodeUrl != null) {
                     if (isSniffing || realVideoUrl == null) {
-                        // ★ 核心修复：固定 16:9 比例的占位加载框，彻底防止闪烁坍塌
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -268,7 +330,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                 selectedEpisodeUrl = url
                                 selectedEpisodeName = name
                                 realVideoUrl = null
-                                isSniffing = true // ★ 修复
+                                isSniffing = true 
                                 isPlaying = true 
                             },
                             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))
@@ -308,7 +370,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                             selectedEpisodeUrl = url
                             selectedEpisodeName = name
                             realVideoUrl = null
-                            isSniffing = true // ★ 修复
+                            isSniffing = true 
                             isPlaying = true 
                         },
                         isExpandedScreen = isExpandedScreen,
@@ -375,7 +437,6 @@ fun MovieContent(movieInfo: MovieInfo) {
                                 )
                             } else {
                                 if (isSniffing || realVideoUrl == null) {
-                                    // ★ 核心修复：固定 16:9 比例的占位加载框
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -406,7 +467,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                             selectedEpisodeUrl = url
                                             selectedEpisodeName = name
                                             realVideoUrl = null
-                                            isSniffing = true // ★ 修复
+                                            isSniffing = true 
                                             isPlaying = true 
                                         },
                                         modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))
@@ -454,7 +515,7 @@ fun MovieContent(movieInfo: MovieInfo) {
                                 selectedEpisodeUrl = url
                                 selectedEpisodeName = name
                                 realVideoUrl = null
-                                isSniffing = true // ★ 修复
+                                isSniffing = true 
                                 isPlaying = true 
                             },
                             isExpandedScreen = isExpandedScreen,

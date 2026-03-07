@@ -45,7 +45,7 @@ class InfoViewModel : ViewModel() {
                     Log.d("InfoViewModel", "成功加载本地测试 HTML: ${file.length()} bytes")
                     
                     // 模拟一下网络延迟（可选，如果你想测试骨架屏加载动画，可以取消下面这行的注释）
-                    // kotlinx.coroutines.delay(1000) 
+                    kotlinx.coroutines.delay(1000) 
                 } else {
                     // ================= 生产模式：发起网络请求 =================
                     val request = Request.Builder().url(url).build()

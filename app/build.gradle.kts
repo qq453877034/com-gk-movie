@@ -51,7 +51,6 @@ if (!keystoreFile.exists()) {
     }
 }
 
-
 android {
     namespace = "com.gk.movie"
     compileSdk = 36 

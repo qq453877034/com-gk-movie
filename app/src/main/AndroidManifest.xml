@@ -39,7 +39,7 @@
         tools:targetApi="36">
          
         <activity
-            android:name="com.gk.movie.Utils.Media3Play.ui.infoActivity"
+            android:name="com.gk.movie.Utils.Category.ui.InfoCategoryActivity"
             android:exported="true"
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize"
