@@ -8,7 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -42,6 +44,7 @@ import com.gk.movie.Utils.Category.Util.CategoryMovie
 import com.gk.movie.Utils.Category.Util.CategoryUiState
 import com.gk.movie.Utils.Category.Util.InfoCategoryModel
 import com.gk.movie.Utils.Category.Util.PageItem
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -53,21 +56,18 @@ fun InfoCategoryScreen(
     var searchQuery by remember { mutableStateOf("") }
     
     val configuration = LocalConfiguration.current
-    
-    // ★ 核心修复 1：判断当前窗口是否狭窄（用于排版：隐藏标题、拉长搜索框）
     val isCompactWindow = configuration.screenWidthDp < 600
-    
-    // ★ 核心修复 2：判断物理设备是否是真正的手机（用于全局缩放）
-    // smallestScreenWidthDp 是屏幕最短边的物理尺寸，无论怎么开小窗它都不会变
     val isPhoneDevice = configuration.smallestScreenWidthDp < 600
 
-    // 仅在真正的手机端进行 30% (0.7f) 缩放，平板（无论全屏还是小窗）保持 1f
-    val scaleFactor = if (isPhoneDevice) 0.85f else 1f
+    val scaleFactor = if (isPhoneDevice) 0.8f else 1f
     val currentDensity = LocalDensity.current
     val customDensity = Density(
         density = currentDensity.density * scaleFactor,
         fontScale = currentDensity.fontScale * scaleFactor
     )
+
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         Scaffold(
@@ -88,7 +88,6 @@ fun InfoCategoryScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 排版受窗口宽度控制
                                 if (!isCompactWindow) {
                                     Text(
                                         text = "${title}分类",
@@ -105,10 +104,10 @@ fun InfoCategoryScreen(
                                     horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
                                     modifier = Modifier.weight(1f) 
                                 ) {
+                                    val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
+                                    
                                     Box(
-                                        modifier = Modifier
-                                            .weight(1f) 
-                                            .widthIn(max = if (isCompactWindow) Dp.Infinity else 320.dp)
+                                        modifier = searchBarModifier
                                             .height(40.dp) 
                                             .clip(RoundedCornerShape(100.dp))
                                             .background(MaterialTheme.colorScheme.surfaceVariant),
@@ -175,12 +174,13 @@ fun InfoCategoryScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .statusBarsPadding() 
-                                    .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp),
+                                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (!isCompactWindow) {
-                                    Box(modifier = Modifier.width(100.dp).height(32.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
+                                    // ★ 还原为真实的尺寸: 120 x 36
+                                    Box(modifier = Modifier.width(120.dp).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
                                     Spacer(modifier = Modifier.width(16.dp))
                                 }
                                 
@@ -189,16 +189,18 @@ fun InfoCategoryScreen(
                                     horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
                                     modifier = Modifier.weight(1f)
                                 ) {
+                                    val searchBarModifier = if (isCompactWindow) Modifier.weight(1f) else Modifier.width(280.dp)
+                                    
                                     Box(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .widthIn(max = if (isCompactWindow) Dp.Infinity else 320.dp)
+                                        modifier = searchBarModifier
+                                            // ★ 还原为真实的尺寸: 40
                                             .height(40.dp)
                                             .clip(RoundedCornerShape(100.dp))
                                             .shimmerEffect()
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     repeat(2) {
+                                        // ★ 还原为真实的尺寸: 36
                                         Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
@@ -221,9 +223,14 @@ fun InfoCategoryScreen(
                             PaginationBar(
                                 pageItems = data.pageItems,
                                 pageTips = data.pageTips,
-                                onPageClick = { url -> viewModel.fetchCategoryData(url) },
+                                onPageClick = { url -> 
+                                    viewModel.fetchCategoryData(url) 
+                                    coroutineScope.launch {
+                                        if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1) 
+                                    }
+                                },
                                 modifier = Modifier.navigationBarsPadding(),
-                                isCompactWindow = isCompactWindow // 传递判断状态
+                                isCompactWindow = isCompactWindow
                             )
                         }
                     }
@@ -240,27 +247,20 @@ fun InfoCategoryScreen(
                                     .padding(vertical = 12.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(150.dp)
-                                        .height(16.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .shimmerEffect()
-                                )
+                                // ★ 还原真实文字大致尺寸
+                                Box(modifier = Modifier.width(150.dp).height(16.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
                                 Spacer(modifier = Modifier.height(8.dp))
-                                
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 ) {
+                                    // ★ 还原真实分页按钮尺寸：高度 36
                                     if (isCompactWindow) {
-                                        val compactWidths = listOf(56.dp, 70.dp, 70.dp, 56.dp)
-                                        compactWidths.forEach { w ->
+                                        listOf(56.dp, 70.dp, 70.dp, 56.dp).forEach { w ->
                                             Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
                                         }
                                     } else {
-                                        val normalWidths = listOf(56.dp, 70.dp, 36.dp, 36.dp, 36.dp, 36.dp, 46.dp, 70.dp, 56.dp)
-                                        normalWidths.forEach { w ->
+                                        listOf(56.dp, 70.dp, 36.dp, 36.dp, 36.dp, 36.dp, 46.dp, 70.dp, 56.dp).forEach { w ->
                                             Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
                                         }
                                     }
@@ -275,7 +275,7 @@ fun InfoCategoryScreen(
             when (uiState) {
                 is CategoryUiState.Loading -> {
                     Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                        CategorySkeletonScreen(isCompactWindow = isCompactWindow)
+                        CategorySkeletonScreen(listState = listState)
                     }
                 }
                 is CategoryUiState.Error -> {
@@ -298,6 +298,7 @@ fun InfoCategoryScreen(
 
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
+                            state = listState, 
                             contentPadding = PaddingValues(bottom = 16.dp) 
                         ) {
                             item {
@@ -326,7 +327,10 @@ fun InfoCategoryScreen(
                                                     modifier = Modifier
                                                         .height(36.dp)
                                                         .clip(RoundedCornerShape(16.dp))
-                                                        .clickable { viewModel.fetchCategoryData(item.url) }
+                                                        .clickable { 
+                                                            viewModel.fetchCategoryData(item.url) 
+                                                            coroutineScope.launch { listState.scrollToItem(0) }
+                                                        }
                                                 ) {
                                                     Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
                                                         Text(text = item.name, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
@@ -357,7 +361,12 @@ fun InfoCategoryScreen(
                                                 modifier = Modifier
                                                     .height(32.dp)
                                                     .clip(RoundedCornerShape(8.dp))
-                                                    .clickable { viewModel.fetchCategoryData(item.url) }
+                                                    .clickable { 
+                                                        viewModel.fetchCategoryData(item.url) 
+                                                        coroutineScope.launch {
+                                                            if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1)
+                                                        }
+                                                    }
                                             ) {
                                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
                                                     Text(text = item.name, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
@@ -400,7 +409,7 @@ fun PaginationBar(
     pageTips: String, 
     onPageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
-    isCompactWindow: Boolean // 接收外部传入的窗口状态
+    isCompactWindow: Boolean
 ) {
     val displayPageItems = if (isCompactWindow) {
         pageItems.filter { item ->
