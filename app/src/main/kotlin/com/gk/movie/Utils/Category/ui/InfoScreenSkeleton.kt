@@ -30,7 +30,8 @@ fun Modifier.shimmerEffect(): Modifier {
 }
 
 @Composable
-fun CategorySkeletonScreen() {
+fun CategorySkeletonScreen(isCompactWindow: Boolean) {
+    // 此时外层已经做好了 LocalDensity 缩放管理，这里只需要老老实实画 UI 占位
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val minItemWidth = 130.dp
         val rawColumns = (maxWidth / minItemWidth).toInt()
@@ -38,16 +39,13 @@ fun CategorySkeletonScreen() {
         
         Column(modifier = Modifier.fillMaxSize()) {
             
-            // ★ 原本这里的 1.模拟顶部标题栏 已经被彻底移除
-            // 因为我们把它交给了外层 Scaffold 的 topBar 统一管理，彻底杜绝高度偏差！
-
             // 1. 模拟上层普通分类筛选骨架
             Column(modifier = Modifier.padding(vertical = 12.dp)) {
-                repeat(3) {
+                repeat(4) {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Box(modifier = Modifier.width(40.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
                         Spacer(modifier = Modifier.width(16.dp))
-                        repeat(5) {
+                        repeat(20) {
                             Box(modifier = Modifier.width(60.dp).height(36.dp).clip(RoundedCornerShape(16.dp)).shimmerEffect())
                             Spacer(modifier = Modifier.width(8.dp))
                         }

@@ -26,10 +26,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -50,322 +53,337 @@ fun InfoCategoryScreen(
     var searchQuery by remember { mutableStateOf("") }
     
     val configuration = LocalConfiguration.current
-    val isCompactScreen = configuration.screenWidthDp < 600
+    
+    // ★ 核心修复 1：判断当前窗口是否狭窄（用于排版：隐藏标题、拉长搜索框）
+    val isCompactWindow = configuration.screenWidthDp < 600
+    
+    // ★ 核心修复 2：判断物理设备是否是真正的手机（用于全局缩放）
+    // smallestScreenWidthDp 是屏幕最短边的物理尺寸，无论怎么开小窗它都不会变
+    val isPhoneDevice = configuration.smallestScreenWidthDp < 600
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            when (uiState) {
-                is CategoryUiState.Success -> {
-                    val title = (uiState as CategoryUiState.Success).data.pageTitle
-                    Surface(
-                        color = MaterialTheme.colorScheme.background, 
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding() 
-                                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp), 
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+    // 仅在真正的手机端进行 30% (0.7f) 缩放，平板（无论全屏还是小窗）保持 1f
+    val scaleFactor = if (isPhoneDevice) 0.85f else 1f
+    val currentDensity = LocalDensity.current
+    val customDensity = Density(
+        density = currentDensity.density * scaleFactor,
+        fontScale = currentDensity.fontScale * scaleFactor
+    )
+
+    CompositionLocalProvider(LocalDensity provides customDensity) {
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                when (uiState) {
+                    is CategoryUiState.Success -> {
+                        val title = (uiState as CategoryUiState.Success).data.pageTitle
+                        Surface(
+                            color = MaterialTheme.colorScheme.background, 
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (!isCompactScreen) {
-                                Text(
-                                    text = "${title}分类",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.ExtraBold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    letterSpacing = 1.sp,
-                                    modifier = Modifier.padding(end = 16.dp)
-                                )
-                            }
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = if (isCompactScreen) Arrangement.Start else Arrangement.End,
-                                modifier = Modifier.weight(1f) 
-                            ) {
-                                // ★ 核心修改：小窗占满剩余空间，大屏固定 280dp 宽度不占满行
-                                val searchBarModifier = if (isCompactScreen) Modifier.weight(1f) else Modifier.width(280.dp)
-                                
-                                Box(
-                                    modifier = searchBarModifier
-                                        .height(40.dp) 
-                                        .clip(RoundedCornerShape(100.dp))
-                                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.padding(horizontal = 12.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Rounded.Search,
-                                            contentDescription = "Search",
-                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        
-                                        BasicTextField(
-                                            value = searchQuery,
-                                            onValueChange = { searchQuery = it },
-                                            singleLine = true,
-                                            textStyle = TextStyle(
-                                                fontSize = 14.sp,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            ),
-                                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                            keyboardActions = KeyboardActions(
-                                                onSearch = { Log.d("CategoryScreen", "触发搜索: $searchQuery") }
-                                            ),
-                                            decorationBox = { innerTextField ->
-                                                if (searchQuery.isEmpty()) {
-                                                    Text(
-                                                        text = "搜索热播影片...",
-                                                        fontSize = 14.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                                    )
-                                                }
-                                                innerTextField()
-                                            },
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(8.dp)) 
-
-                                IconButton(onClick = { /* TODO: 跳转历史 */ }) {
-                                    Icon(Icons.Rounded.History, contentDescription = "历史记录", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                                IconButton(onClick = { /* TODO: 跳转收藏 */ }) {
-                                    Icon(Icons.Rounded.FavoriteBorder, contentDescription = "我的收藏", tint = MaterialTheme.colorScheme.onSurface)
-                                }
-                            }
-                        }
-                    }
-                }
-                is CategoryUiState.Loading -> {
-                    // ★ 骨架屏同步修改，保证 Loading 时和真实数据宽度表现绝对一致
-                    Surface(
-                        color = MaterialTheme.colorScheme.background, 
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .statusBarsPadding() 
-                                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (!isCompactScreen) {
-                                Box(modifier = Modifier.width(100.dp).height(32.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                Spacer(modifier = Modifier.width(16.dp))
-                            }
-                            
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = if (isCompactScreen) Arrangement.Start else Arrangement.End,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                // ★ 同样应用判断逻辑
-                                val searchBarModifier = if (isCompactScreen) Modifier.weight(1f) else Modifier.width(280.dp)
-                                
-                                Box(
-                                    modifier = searchBarModifier
-                                        .height(40.dp)
-                                        .clip(RoundedCornerShape(100.dp))
-                                        .shimmerEffect()
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                repeat(2) {
-                                    Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                }
-                            }
-                        }
-                    }
-                }
-                else -> {}
-            }
-        },
-        bottomBar = {
-            when (uiState) {
-                is CategoryUiState.Success -> {
-                    val data = (uiState as CategoryUiState.Success).data
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant, 
-                        shadowElevation = 8.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        PaginationBar(
-                            pageItems = data.pageItems,
-                            pageTips = data.pageTips,
-                            onPageClick = { url -> viewModel.fetchCategoryData(url) },
-                            modifier = Modifier.navigationBarsPadding() 
-                        )
-                    }
-                }
-                is CategoryUiState.Loading -> {
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant, 
-                        shadowElevation = 8.dp,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(vertical = 12.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .width(150.dp)
-                                    .height(16.dp)
-                                    .clip(RoundedCornerShape(4.dp))
-                                    .shimmerEffect()
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            ) {
-                                if (isCompactScreen) {
-                                    val compactWidths = listOf(56.dp, 70.dp, 70.dp, 56.dp)
-                                    compactWidths.forEach { w ->
-                                        Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                    }
-                                } else {
-                                    val normalWidths = listOf(56.dp, 70.dp, 36.dp, 36.dp, 36.dp, 36.dp, 46.dp, 70.dp, 56.dp)
-                                    normalWidths.forEach { w ->
-                                        Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                else -> {}
-            }
-        }
-    ) { innerPadding ->
-        when (uiState) {
-            is CategoryUiState.Loading -> {
-                Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-                    CategorySkeletonScreen()
-                }
-            }
-            is CategoryUiState.Error -> {
-                val message = (uiState as CategoryUiState.Error).message
-                Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(text = message, color = MaterialTheme.colorScheme.error)
-                }
-            }
-            is CategoryUiState.Success -> {
-                val data = (uiState as CategoryUiState.Success).data
-                
-                BoxWithConstraints(
-                    modifier = Modifier
-                        .padding(innerPadding)
-                        .fillMaxSize()
-                ) {
-                    val minItemWidth = 130.dp
-                    val rawColumns = (maxWidth / minItemWidth).toInt()
-                    val columns = maxOf(1, if (rawColumns >= 4) rawColumns - 1 else rawColumns)
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 16.dp) 
-                    ) {
-                        item {
-                            Column(modifier = Modifier.padding(top = 8.dp)) {
-                                data.filters.forEach { filterGroup ->
-                                    LazyRow(
-                                        contentPadding = PaddingValues(horizontal = 16.dp),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.padding(vertical = 4.dp)
-                                    ) {
-                                        item {
-                                            Text(
-                                                text = filterGroup.groupName,
-                                                fontWeight = FontWeight.Bold,
-                                                modifier = Modifier.padding(end = 8.dp, top = 10.dp),
-                                                color = MaterialTheme.colorScheme.primary
-                                            )
-                                        }
-                                        items(filterGroup.items) { item ->
-                                            val isSelected = item.isSelected
-                                            Surface(
-                                                shape = RoundedCornerShape(16.dp),
-                                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                                                border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                                modifier = Modifier
-                                                    .height(36.dp)
-                                                    .clip(RoundedCornerShape(16.dp))
-                                                    .clickable { viewModel.fetchCategoryData(item.url) }
-                                            ) {
-                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
-                                                    Text(text = item.name, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        stickyHeader {
-                            Surface(
-                                color = MaterialTheme.colorScheme.background,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                            ) {
-                                LazyRow(
-                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    items(data.sortItems) { item ->
-                                        val isSelected = item.isSelected
-                                        Surface(
-                                            shape = RoundedCornerShape(8.dp),
-                                            color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                                            contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                                            border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary) else null,
-                                            modifier = Modifier
-                                                .height(32.dp)
-                                                .clip(RoundedCornerShape(8.dp))
-                                                .clickable { viewModel.fetchCategoryData(item.url) }
-                                        ) {
-                                            Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
-                                                Text(text = item.name, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        items(data.movies.chunked(columns)) { rowMovies ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    .statusBarsPadding() 
+                                    .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp), 
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                for (movie in rowMovies) {
-                                    Box(modifier = Modifier.weight(1f)) {
-                                        MovieItemCard(movie = movie, onClick = { onMovieClick(movie.detailUrl) })
+                                // 排版受窗口宽度控制
+                                if (!isCompactWindow) {
+                                    Text(
+                                        text = "${title}分类",
+                                        style = MaterialTheme.typography.headlineMedium,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        letterSpacing = 1.sp,
+                                        modifier = Modifier.padding(end = 16.dp)
+                                    )
+                                }
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
+                                    modifier = Modifier.weight(1f) 
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f) 
+                                            .widthIn(max = if (isCompactWindow) Dp.Infinity else 320.dp)
+                                            .height(40.dp) 
+                                            .clip(RoundedCornerShape(100.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 12.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Search,
+                                                contentDescription = "Search",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            
+                                            BasicTextField(
+                                                value = searchQuery,
+                                                onValueChange = { searchQuery = it },
+                                                singleLine = true,
+                                                textStyle = TextStyle(
+                                                    fontSize = 14.sp,
+                                                    color = MaterialTheme.colorScheme.onSurface
+                                                ),
+                                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                                keyboardActions = KeyboardActions(
+                                                    onSearch = { Log.d("CategoryScreen", "触发搜索: $searchQuery") }
+                                                ),
+                                                decorationBox = { innerTextField ->
+                                                    if (searchQuery.isEmpty()) {
+                                                        Text(
+                                                            text = "搜索热播影片...",
+                                                            fontSize = 14.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                                        )
+                                                    }
+                                                    innerTextField()
+                                                },
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp)) 
+
+                                    IconButton(onClick = { /* TODO: 跳转历史 */ }) {
+                                        Icon(Icons.Rounded.History, contentDescription = "历史记录", tint = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                    IconButton(onClick = { /* TODO: 跳转收藏 */ }) {
+                                        Icon(Icons.Rounded.FavoriteBorder, contentDescription = "我的收藏", tint = MaterialTheme.colorScheme.onSurface)
                                     }
                                 }
-                                val emptySpaces = columns - rowMovies.size
-                                repeat(emptySpaces) {
-                                    Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                    is CategoryUiState.Loading -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.background, 
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .statusBarsPadding() 
+                                    .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (!isCompactWindow) {
+                                    Box(modifier = Modifier.width(100.dp).height(32.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                }
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = if (isCompactWindow) Arrangement.Start else Arrangement.End,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .widthIn(max = if (isCompactWindow) Dp.Infinity else 320.dp)
+                                            .height(40.dp)
+                                            .clip(RoundedCornerShape(100.dp))
+                                            .shimmerEffect()
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    repeat(2) {
+                                        Box(modifier = Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).shimmerEffect())
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+            },
+            bottomBar = {
+                when (uiState) {
+                    is CategoryUiState.Success -> {
+                        val data = (uiState as CategoryUiState.Success).data
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant, 
+                            shadowElevation = 8.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            PaginationBar(
+                                pageItems = data.pageItems,
+                                pageTips = data.pageTips,
+                                onPageClick = { url -> viewModel.fetchCategoryData(url) },
+                                modifier = Modifier.navigationBarsPadding(),
+                                isCompactWindow = isCompactWindow // 传递判断状态
+                            )
+                        }
+                    }
+                    is CategoryUiState.Loading -> {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant, 
+                            shadowElevation = 8.dp,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .navigationBarsPadding()
+                                    .padding(vertical = 12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(150.dp)
+                                        .height(16.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .shimmerEffect()
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                ) {
+                                    if (isCompactWindow) {
+                                        val compactWidths = listOf(56.dp, 70.dp, 70.dp, 56.dp)
+                                        compactWidths.forEach { w ->
+                                            Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
+                                        }
+                                    } else {
+                                        val normalWidths = listOf(56.dp, 70.dp, 36.dp, 36.dp, 36.dp, 36.dp, 46.dp, 70.dp, 56.dp)
+                                        normalWidths.forEach { w ->
+                                            Box(modifier = Modifier.width(w).height(36.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        ) { innerPadding ->
+            when (uiState) {
+                is CategoryUiState.Loading -> {
+                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        CategorySkeletonScreen(isCompactWindow = isCompactWindow)
+                    }
+                }
+                is CategoryUiState.Error -> {
+                    val message = (uiState as CategoryUiState.Error).message
+                    Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(text = message, color = MaterialTheme.colorScheme.error)
+                    }
+                }
+                is CategoryUiState.Success -> {
+                    val data = (uiState as CategoryUiState.Success).data
+                    
+                    BoxWithConstraints(
+                        modifier = Modifier
+                            .padding(innerPadding)
+                            .fillMaxSize()
+                    ) {
+                        val minItemWidth = 130.dp
+                        val rawColumns = (maxWidth / minItemWidth).toInt()
+                        val columns = maxOf(1, if (rawColumns >= 4) rawColumns - 1 else rawColumns)
+
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(bottom = 16.dp) 
+                        ) {
+                            item {
+                                Column(modifier = Modifier.padding(top = 8.dp)) {
+                                    data.filters.forEach { filterGroup ->
+                                        LazyRow(
+                                            contentPadding = PaddingValues(horizontal = 16.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.padding(vertical = 4.dp)
+                                        ) {
+                                            item {
+                                                Text(
+                                                    text = filterGroup.groupName,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(end = 8.dp, top = 10.dp),
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                            items(filterGroup.items) { item ->
+                                                val isSelected = item.isSelected
+                                                Surface(
+                                                    shape = RoundedCornerShape(16.dp),
+                                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                    border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                                    modifier = Modifier
+                                                        .height(36.dp)
+                                                        .clip(RoundedCornerShape(16.dp))
+                                                        .clickable { viewModel.fetchCategoryData(item.url) }
+                                                ) {
+                                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
+                                                        Text(text = item.name, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            stickyHeader {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.background,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                                ) {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        items(data.sortItems) { item ->
+                                            val isSelected = item.isSelected
+                                            Surface(
+                                                shape = RoundedCornerShape(8.dp),
+                                                color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                                                contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                border = if (isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.secondary) else null,
+                                                modifier = Modifier
+                                                    .height(32.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                                    .clickable { viewModel.fetchCategoryData(item.url) }
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 12.dp)) {
+                                                    Text(text = item.name, fontSize = 13.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            items(data.movies.chunked(columns)) { rowMovies ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    for (movie in rowMovies) {
+                                        Box(modifier = Modifier.weight(1f)) {
+                                            MovieItemCard(movie = movie, onClick = { onMovieClick(movie.detailUrl) })
+                                        }
+                                    }
+                                    val emptySpaces = columns - rowMovies.size
+                                    repeat(emptySpaces) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
@@ -381,12 +399,10 @@ fun PaginationBar(
     pageItems: List<PageItem>, 
     pageTips: String, 
     onPageClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isCompactWindow: Boolean // 接收外部传入的窗口状态
 ) {
-    val configuration = LocalConfiguration.current
-    val isCompactScreen = configuration.screenWidthDp < 600
-
-    val displayPageItems = if (isCompactScreen) {
+    val displayPageItems = if (isCompactWindow) {
         pageItems.filter { item ->
             val isNumberOrDots = item.title.toIntOrNull() != null || item.title.contains("...")
             !isNumberOrDots
