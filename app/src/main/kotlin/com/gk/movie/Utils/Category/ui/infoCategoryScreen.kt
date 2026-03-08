@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -59,7 +60,7 @@ fun InfoCategoryScreen(
     val isCompactWindow = configuration.screenWidthDp < 600
     val isPhoneDevice = configuration.smallestScreenWidthDp < 600
 
-    val scaleFactor = if (isPhoneDevice) 0.85f else 1f
+    val scaleFactor = if (isPhoneDevice) 0.8f else 1f
     val currentDensity = LocalDensity.current
     val customDensity = Density(
         density = currentDensity.density * scaleFactor,
@@ -70,15 +71,23 @@ fun InfoCategoryScreen(
     val coroutineScope = rememberCoroutineScope()
 
     var cachedSuccessState by remember { mutableStateOf<CategoryUiState.Success?>(null) }
+    var pendingSelections by remember { mutableStateOf(mapOf<String, String>()) }
+
     LaunchedEffect(uiState) {
         if (uiState is CategoryUiState.Success) {
             cachedSuccessState = uiState as CategoryUiState.Success
+            pendingSelections = emptyMap()
+        } else if (uiState is CategoryUiState.Error) {
+            pendingSelections = emptyMap()
         }
     }
 
     val displayState = (uiState as? CategoryUiState.Success) ?: cachedSuccessState
     val isLoading = uiState is CategoryUiState.Loading
     val isInitialLoading = isLoading && cachedSuccessState == null
+    
+    // ★ 智能计算吸顶栏的索引位置 (打平分类列表后，吸顶栏的索引等于分类的行数)
+    val stickyHeaderIndex = displayState?.data?.filters?.size ?: 4
 
     CompositionLocalProvider(LocalDensity provides customDensity) {
         Scaffold(
@@ -192,7 +201,6 @@ fun InfoCategoryScreen(
                 }
             },
             bottomBar = {
-                // ★ 终极优化：彻底移除底部的呼吸灯骨架逻辑。只要有缓存数据，就直接展示真实的分页栏！
                 if (displayState != null) {
                     val data = displayState.data
                     Surface(
@@ -203,15 +211,20 @@ fun InfoCategoryScreen(
                         PaginationBar(
                             pageItems = data.pageItems,
                             pageTips = data.pageTips,
+                            pendingPageUrl = pendingSelections["PAGE_GROUP"],
                             onPageClick = { url -> 
+                                pendingSelections = pendingSelections + ("PAGE_GROUP" to url)
                                 viewModel.fetchCategoryData(url) 
                                 coroutineScope.launch {
-                                    if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1) 
+                                    // ★ 使用智能计算出的吸顶索引
+                                    if (listState.firstVisibleItemIndex >= stickyHeaderIndex) {
+                                        listState.scrollToItem(stickyHeaderIndex) 
+                                    }
                                 }
                             },
                             modifier = Modifier.navigationBarsPadding(),
                             isCompactWindow = isCompactWindow,
-                            isLoading = isLoading // ★ 传入 Loading 状态，防止网络请求时用户狂点下一页
+                            isLoading = isLoading 
                         )
                     }
                 }
@@ -241,45 +254,63 @@ fun InfoCategoryScreen(
                         val rawColumns = (maxWidth / minItemWidth).toInt()
                         val columns = maxOf(1, if (rawColumns >= 4) rawColumns - 1 else rawColumns)
 
+                        val chunkedMovies = remember(data.movies, columns) {
+                            data.movies.chunked(columns)
+                        }
+
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             state = listState, 
                             contentPadding = PaddingValues(bottom = 16.dp) 
                         ) {
-                            item {
-                                Column(modifier = Modifier.padding(top = 8.dp)) {
-                                    data.filters.forEach { filterGroup ->
-                                        LazyRow(
-                                            contentPadding = PaddingValues(horizontal = 16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            modifier = Modifier.padding(vertical = 4.dp)
-                                        ) {
-                                            item {
-                                                Text(
-                                                    text = filterGroup.groupName,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(end = 8.dp, top = 10.dp),
-                                                    color = MaterialTheme.colorScheme.primary
-                                                )
+                            // ★ 终极性能优化：彻底打平 FilterGroup！
+                            // 不再用一个 item 包裹全部，而是将每一行分类作为一个独立的 item，极大减轻滑动下拉时的瞬间渲染压力
+                            data.filters.forEachIndexed { index, filterGroup ->
+                                item(key = "FilterRow_${filterGroup.groupName}", contentType = "FilterRow") {
+                                    LazyRow(
+                                        contentPadding = PaddingValues(horizontal = 16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        // 完美复原此前的边距视觉：第一行顶部 12dp，其他行顶部 4dp
+                                        modifier = Modifier.padding(
+                                            top = if (index == 0) 12.dp else 4.dp,
+                                            bottom = 4.dp
+                                        )
+                                    ) {
+                                        item(key = "Title_${filterGroup.groupName}", contentType = "FilterTitle") {
+                                            Text(
+                                                text = filterGroup.groupName,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(end = 8.dp, top = 10.dp),
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        items(
+                                            items = filterGroup.items,
+                                            key = { item -> "FilterItem_${filterGroup.groupName}_${item.name}" },
+                                            contentType = { "FilterItem" }
+                                        ) { item ->
+                                            val isSelected = if (pendingSelections.containsKey(filterGroup.groupName)) {
+                                                item.url == pendingSelections[filterGroup.groupName]
+                                            } else {
+                                                item.isSelected
                                             }
-                                            items(filterGroup.items) { item ->
-                                                val isSelected = item.isSelected
-                                                Surface(
-                                                    shape = RoundedCornerShape(16.dp),
-                                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
-                                                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-                                                    border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                                    modifier = Modifier
-                                                        .height(36.dp)
-                                                        .clip(RoundedCornerShape(16.dp))
-                                                        .clickable { 
-                                                            viewModel.fetchCategoryData(item.url) 
-                                                            coroutineScope.launch { listState.scrollToItem(0) }
-                                                        }
-                                                ) {
-                                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
-                                                        Text(text = item.name, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                            
+                                            Surface(
+                                                shape = RoundedCornerShape(16.dp),
+                                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                                contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                                                border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                                                modifier = Modifier
+                                                    .height(36.dp)
+                                                    .clip(RoundedCornerShape(16.dp))
+                                                    .clickable { 
+                                                        pendingSelections = pendingSelections + (filterGroup.groupName to item.url)
+                                                        viewModel.fetchCategoryData(item.url) 
+                                                        coroutineScope.launch { listState.scrollToItem(0) }
                                                     }
+                                            ) {
+                                                Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(horizontal = 16.dp)) {
+                                                    Text(text = item.name, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                                 }
                                             }
                                         }
@@ -287,7 +318,8 @@ fun InfoCategoryScreen(
                                 }
                             }
 
-                            stickyHeader {
+                            // 动态索引跟随的吸顶栏
+                            stickyHeader(key = "StickySortHeader", contentType = "SortHeader") {
                                 Surface(
                                     color = MaterialTheme.colorScheme.background,
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -296,8 +328,17 @@ fun InfoCategoryScreen(
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
-                                        items(data.sortItems) { item ->
-                                            val isSelected = item.isSelected
+                                        items(
+                                            items = data.sortItems,
+                                            key = { item -> "SortItem_${item.name}" },
+                                            contentType = { "SortItem" }
+                                        ) { item ->
+                                            val isSelected = if (pendingSelections.containsKey("SORT_GROUP")) {
+                                                item.url == pendingSelections["SORT_GROUP"]
+                                            } else {
+                                                item.isSelected
+                                            }
+                                            
                                             Surface(
                                                 shape = RoundedCornerShape(8.dp),
                                                 color = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
@@ -307,9 +348,12 @@ fun InfoCategoryScreen(
                                                     .height(32.dp)
                                                     .clip(RoundedCornerShape(8.dp))
                                                     .clickable { 
+                                                        pendingSelections = pendingSelections + ("SORT_GROUP" to item.url)
                                                         viewModel.fetchCategoryData(item.url) 
                                                         coroutineScope.launch {
-                                                            if (listState.firstVisibleItemIndex > 0) listState.scrollToItem(1)
+                                                            if (listState.firstVisibleItemIndex >= stickyHeaderIndex) {
+                                                                listState.scrollToItem(stickyHeaderIndex)
+                                                            }
                                                         }
                                                     }
                                             ) {
@@ -323,13 +367,17 @@ fun InfoCategoryScreen(
                             }
 
                             if (uiState is CategoryUiState.Error) {
-                                item {
+                                item(key = "ErrorBottom", contentType = "Error") {
                                     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp), contentAlignment = Alignment.Center) {
                                         Text(text = (uiState as CategoryUiState.Error).message, color = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             } else if (isLoading) {
-                                items(6) {
+                                items(
+                                    count = 6,
+                                    key = { index -> "LoadingRow_$index" },
+                                    contentType = { "LoadingMovieRow" }
+                                ) {
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -353,7 +401,11 @@ fun InfoCategoryScreen(
                                     }
                                 }
                             } else {
-                                items(data.movies.chunked(columns)) { rowMovies ->
+                                items(
+                                    items = chunkedMovies,
+                                    key = { rowMovies -> "RealMovieRow_${rowMovies.firstOrNull()?.detailUrl.hashCode()}" },
+                                    contentType = { "RealMovieRow" }
+                                ) { rowMovies ->
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -387,7 +439,8 @@ fun PaginationBar(
     onPageClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     isCompactWindow: Boolean,
-    isLoading: Boolean // ★ 接收加载状态
+    isLoading: Boolean,
+    pendingPageUrl: String? = null 
 ) {
     val displayPageItems = if (isCompactWindow) {
         pageItems.filter { item ->
@@ -413,9 +466,20 @@ fun PaginationBar(
             horizontalArrangement = Arrangement.spacedBy(8.dp), 
             contentPadding = PaddingValues(horizontal = 16.dp)
         ) {
-            items(displayPageItems) { item ->
-                val containerColor = if (item.isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-                val contentColor = if (item.isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            // ★ 修复闪退：使用 itemsIndexed 并将 index 编入 key 之中！
+            itemsIndexed(
+                items = displayPageItems,
+                key = { index, item -> "PageBtn_${index}_${item.title}_${item.url}" } 
+            ) { index, item ->
+                
+                val isActive = if (pendingPageUrl != null && pendingPageUrl.isNotEmpty()) {
+                    item.url == pendingPageUrl
+                } else {
+                    item.isActive
+                }
+                
+                val containerColor = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                val contentColor = if (isActive) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
                 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -425,11 +489,10 @@ fun PaginationBar(
                     modifier = Modifier
                         .height(36.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        // ★ 网络请求中自动禁用点击，防止多次触发重复请求
-                        .clickable(enabled = !item.isDisabled && !item.isActive && !isLoading) { onPageClick(item.url) }
+                        .clickable(enabled = !item.isDisabled && !isActive && !isLoading) { onPageClick(item.url) }
                 ) {
                     Box(modifier = Modifier.padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
-                        Text(text = item.title, fontSize = 14.sp, fontWeight = if (item.isActive) FontWeight.Bold else FontWeight.Normal)
+                        Text(text = item.title, fontSize = 14.sp, fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal)
                     }
                 }
             }

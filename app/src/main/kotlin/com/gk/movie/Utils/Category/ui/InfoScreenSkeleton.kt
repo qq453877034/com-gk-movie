@@ -49,28 +49,34 @@ fun CategorySkeletonScreen(listState: LazyListState) {
             contentPadding = PaddingValues(bottom = 16.dp)
         ) {
             
-            // 1. 模拟上层普通分类筛选骨架
-            item {
-                // ★ 还原为绝对的 padding(top = 8.dp)，不再人为偏移
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    repeat(4) {
-                        LazyRow(
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            userScrollEnabled = false
-                        ) {
-                            // ★ 还原：标题宽32、高20
-                            item { Box(modifier = Modifier.padding(end = 8.dp, top = 10.dp).width(32.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect()) }
-                            // ★ 还原：药丸高 36，宽 60
-                            items(18) { Box(modifier = Modifier.width(60.dp).height(36.dp).clip(RoundedCornerShape(16.dp)).shimmerEffect()) }
+            // ★ 同步打平：不再将所有行包裹在一个 item 中，彻底释放计算压力
+            repeat(4) { rowIndex ->
+                item(key = "Skeleton_FilterRow_$rowIndex", contentType = "FilterRow") {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        // 同样完美还原间距
+                        modifier = Modifier.padding(
+                            top = if (rowIndex == 0) 12.dp else 4.dp,
+                            bottom = 4.dp
+                        ),
+                        userScrollEnabled = false
+                    ) {
+                        item(key = "Skeleton_Title_$rowIndex", contentType = "FilterTitle") { 
+                            Box(modifier = Modifier.padding(end = 8.dp, top = 10.dp).width(32.dp).height(20.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect()) 
+                        }
+                        items(
+                            count = 18,
+                            key = { colIndex -> "Skeleton_FilterItem_${rowIndex}_$colIndex" },
+                            contentType = { "FilterItem" }
+                        ) { 
+                            Box(modifier = Modifier.width(60.dp).height(36.dp).clip(RoundedCornerShape(16.dp)).shimmerEffect()) 
                         }
                     }
                 }
             }
             
-            // 2. 模拟吸顶排序骨架
-            stickyHeader {
+            stickyHeader(key = "Skeleton_StickySortHeader", contentType = "SortHeader") {
                 Surface(
                     color = MaterialTheme.colorScheme.background,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -80,16 +86,22 @@ fun CategorySkeletonScreen(listState: LazyListState) {
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         userScrollEnabled = false
                     ) {
-                        // ★ 还原：排序药丸高 32，宽 70
-                        items(4) {
+                        items(
+                            count = 4,
+                            key = { index -> "Skeleton_SortItem_$index" },
+                            contentType = { "SortItem" }
+                        ) {
                             Box(modifier = Modifier.width(70.dp).height(32.dp).clip(RoundedCornerShape(8.dp)).shimmerEffect())
                         }
                     }
                 }
             }
 
-            // 3. 模拟视频网格骨架
-            items(6) { 
+            items(
+                count = 6,
+                key = { index -> "Skeleton_MovieRow_$index" },
+                contentType = { "LoadingMovieRow" }
+            ) { 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -105,7 +117,6 @@ fun CategorySkeletonScreen(listState: LazyListState) {
                             Column {
                                 Box(modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).shimmerEffect())
                                 Column(modifier = Modifier.padding(8.dp)) {
-                                    // ★ 还原：电影文字线高 14
                                     Box(modifier = Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(4.dp)).shimmerEffect())
                                 }
                             }
